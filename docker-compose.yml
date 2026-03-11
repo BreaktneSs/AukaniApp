@@ -1,30 +1,23 @@
-version: '3.9'
 
 services:
-  postgres:
+
+  db:
     image: postgres:16
-    container_name: tienda_postgres
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin123
-      POSTGRES_DB: tienda
+      POSTGRES_USER: pos
+      POSTGRES_PASSWORD: pos123
+      POSTGRES_DB: posdb
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: tienda_pgadmin
+  adminer:
+    image: adminer
     restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@local.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
     ports:
-      - "8080:80"
-    depends_on:
-      - postgres
+      - 8080:8080
 
 volumes:
-  pgdata:
+  postgres_data:
