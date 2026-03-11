@@ -1,0 +1,28 @@
+import axios from "axios"
+
+const api = axios.create({
+  baseURL: "/api",
+  timeout: 10000,
+})
+
+// Inyectar token en cada request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("aukani_token")
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+// Manejar 401 globalmente
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("aukani_token")
+      localStorage.removeItem("aukani_user")
+      window.location.href = "/login"
+    }
+    return Promise.reject(err)
+  }
+)
+
+export default api
