@@ -1,8 +1,10 @@
 import { orderController } from "../controllers/order.controller.js"
+import { allRoles, adminOrJefe } from "../middlewares/auth.js"
 
 export async function orderRoutes(fastify) {
-  fastify.post("/sale", orderController.createSale)
-  fastify.get("/orders", orderController.getAll)
-  fastify.get("/orders/summary/daily", orderController.getDailySummary)
-  fastify.get("/orders/:id", orderController.getById)
+  fastify.post("/sale",                    { preHandler: allRoles },    orderController.createSale)
+  fastify.patch("/orders/:id/cancel",      { preHandler: adminOrJefe }, orderController.cancel)
+  fastify.get("/orders",                   { preHandler: adminOrJefe }, orderController.getAll)
+  fastify.get("/orders/summary/daily",     { preHandler: adminOrJefe }, orderController.getDailySummary)
+  fastify.get("/orders/:id",               { preHandler: adminOrJefe }, orderController.getById)
 }
