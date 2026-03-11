@@ -12,15 +12,37 @@ import {
 } from "lucide-react"
 import toast from "react-hot-toast"
 
+// ── ProductImagePlaceholder ──────────────────────────────
+function ProductImagePlaceholder() {
+  return (
+    <div className="w-full h-20 rounded-md mb-2 flex items-center justify-center"
+      style={{ background: "var(--bg-tertiary)" }}>
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
+        <rect x="4" y="10" width="40" height="28" rx="3"
+          stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+        <circle cx="16" cy="20" r="4"
+          stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+        <path d="M4 32 L14 22 L22 30 L30 22 L44 36"
+          stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
+          style={{ color: "var(--border)" }} />
+      </svg>
+    </div>
+  )
+}
+
 // ── ProductCard ───────────────────────────────────────────
 function ProductCard({ product, onAdd }) {
+  const [imgError, setImgError] = useState(false)
   return (
     <button onClick={() => onAdd(product)}
       className="card p-3 text-left transition-all duration-150 animate-fade-in active:scale-95 w-full group"
       style={{ borderColor: "var(--border)" }}>
-      {product.imageUrl && (
+      {product.imageUrl && !imgError ? (
         <img src={`/api${product.imageUrl}`} alt={product.name}
+          onError={() => setImgError(true)}
           className="w-full h-20 object-cover rounded-md mb-2" />
+      ) : (
+        <ProductImagePlaceholder />
       )}
       <p className="text-xs font-semibold leading-tight line-clamp-2 group-hover:text-green-500 transition-colors"
         style={{ color: "var(--text-primary)" }}>
