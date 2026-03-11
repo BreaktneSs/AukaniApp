@@ -7,35 +7,155 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Product {
+// ─── ENUMS ───────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  JEFE
+  VENDEDOR
+}
+
+enum OrderStatus {
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum MovementType {
+  ENTRY
+  EXIT
+  SALE
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+// ─── USUARIOS ────────────────────────────────────────────
+
+model User {
   id        Int      @id @default(autoincrement())
   name      String
-  price     Decimal  @db.Decimal(10, 2)
-  stock     Int      @default(0)
-  barcode   String?  @unique
-  sku       String?  @unique
-  category  String?
+  email     String   @unique
+  password  String
+  role      Role     @default(VENDEDOR)
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  shifts    Shift[]
+  orders    Order[]
+  movements InventoryMovement[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// ─── CATEGORÍAS ──────────────────────────────────────────
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+// ─── MÉTODOS DE PAGO ─────────────────────────────────────
+
+model PaymentMethod {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  payments      OrderPayment[]
+  shiftPayments ShiftPayment[]
+}
+
+// ─── PRODUCTOS ───────────────────────────────────────────
+
+model Product {
+  id         Int      @id @default(autoincrement())
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  cost       Decimal? @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  minStock   Int      @default(0)
+  barcode    String?  @unique
+  sku        String?  @unique
+  imageUrl   String?
+  active     Boolean  @default(true)
+  categoryId Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category   Category?           @relation(fields: [categoryId], references: [id])
   orderItems OrderItem[]
+  movements  InventoryMovement[]
 
   @@index([name])
   @@index([barcode])
   @@index([active])
+  @@index([categoryId])
 }
+
+// ─── TURNOS DE CAJA ──────────────────────────────────────
+
+model Shift {
+  id           Int         @id @default(autoincrement())
+  userId       Int
+  status       ShiftStatus @default(OPEN)
+  openingCash  Decimal     @db.Decimal(10, 2)
+  closingCash  Decimal?    @db.Decimal(10, 2)
+  expectedCash Decimal?    @db.Decimal(10, 2)
+  difference   Decimal?    @db.Decimal(10, 2)
+  notes        String?
+  openedAt     DateTime    @default(now())
+  closedAt     DateTime?
+
+  user          User           @relation(fields: [userId], references: [id])
+  orders        Order[]
+  shiftPayments ShiftPayment[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([openedAt])
+}
+
+model ShiftPayment {
+  id              Int    @id @default(autoincrement())
+  shiftId         Int
+  paymentMethodId Int
+  total           Decimal @db.Decimal(10, 2)
+
+  shift         Shift         @relation(fields: [shiftId], references: [id])
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@unique([shiftId, paymentMethodId])
+}
+
+// ─── VENTAS ──────────────────────────────────────────────
 
 model Order {
   id        Int         @id @default(autoincrement())
   total     Decimal     @db.Decimal(10, 2)
   status    OrderStatus @default(COMPLETED)
+  userId    Int
+  shiftId   Int
   createdAt DateTime    @default(now())
 
-  items OrderItem[]
+  user     User         @relation(fields: [userId], references: [id])
+  shift    Shift        @relation(fields: [shiftId], references: [id])
+  items    OrderItem[]
+  payments OrderPayment[]
 
   @@index([createdAt])
   @@index([status])
+  @@index([userId])
+  @@index([shiftId])
 }
 
 model OrderItem {
@@ -52,8 +172,31 @@ model OrderItem {
   @@index([productId])
 }
 
-enum OrderStatus {
-  COMPLETED
-  CANCELLED
-  REFUNDED
+model OrderPayment {
+  id              Int     @id @default(autoincrement())
+  orderId         Int
+  paymentMethodId Int
+  amount          Decimal @db.Decimal(10, 2)
+
+  order         Order         @relation(fields: [orderId], references: [id])
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+}
+
+// ─── MOVIMIENTOS DE INVENTARIO ───────────────────────────
+
+model InventoryMovement {
+  id        Int          @id @default(autoincrement())
+  productId Int
+  userId    Int
+  type      MovementType
+  quantity  Int
+  reason    String?
+  createdAt DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+  @@index([userId])
+  @@index([createdAt])
 }
