@@ -26,11 +26,35 @@ export const orderService = {
       const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
       if (totalPaid < total) throw { statusCode: 400, message: `Pago insuficiente. Total: ${total}, Pagado: ${totalPaid}` }
 
+      // Distribuir el total real de la venta entre los métodos de pago proporcionalmente.
+      // Si el cliente paga $50.000 en efectivo por una venta de $30.000,
+      // el negocio retiene $30.000 (no $50.000). El cambio NO entra a caja.
+      const change = totalPaid - total
+      const paymentsToRecord = payments
+        .filter(p => Number(p.amount) > 0)
+        .map((p, idx, arr) => {
+          const paidAmount = Number(p.amount)
+          // El cambio siempre sale del último método de pago con saldo
+          // Si hay un solo método: registrar solo el total de la venta
+          if (arr.length === 1) {
+            return { paymentMethodId: p.paymentMethodId, amount: total }
+          }
+          // Si hay múltiples métodos: el cambio sale del último que tenga excedente
+          if (idx === arr.length - 1) {
+            const previousTotal = arr.slice(0, idx).reduce((s, x) => s + Number(x.amount), 0)
+            const thisMethodNet = total - previousTotal
+            return { paymentMethodId: p.paymentMethodId, amount: Math.max(0, thisMethodNet) }
+          }
+          // Los métodos anteriores al último se registran completos (asumiendo que no tienen cambio)
+          return { paymentMethodId: p.paymentMethodId, amount: paidAmount }
+        })
+        .filter(p => p.amount > 0)
+
       const order = await tx.order.create({
         data: {
           total, userId, shiftId,
           items: { create: orderItems },
-          payments: { create: payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: p.amount })) },
+          payments: { create: paymentsToRecord },
         },
         include: {
           items: { include: { product: { select: { id: true, name: true } } } },
