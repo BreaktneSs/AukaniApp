@@ -4,7 +4,11 @@ export const shiftService = {
   async getOpenShift(userId) {
     return prisma.shift.findFirst({
       where: { userId, status: "OPEN" },
-      include: { shiftPayments: { include: { paymentMethod: true } } },
+      include: {
+        user: { select: { id: true, name: true } },
+        shiftPayments: { include: { paymentMethod: true } },
+        _count: { select: { orders: true } },
+      },
     })
   },
 
