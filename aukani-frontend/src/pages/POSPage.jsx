@@ -13,39 +13,42 @@ import {
 } from "lucide-react"
 import toast from "react-hot-toast"
 
-// ── Placeholder SVG ───────────────────────────────────────
-function ImgPlaceholder() {
-  return (
-    <div className="w-full h-20 rounded-md mb-2 flex items-center justify-center"
-      style={{ background: "var(--bg-tertiary)" }}>
-      <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
-        <rect x="4" y="10" width="40" height="28" rx="3" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
-        <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
-        <path d="M4 32 L14 22 L22 30 L30 22 L44 36" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: "var(--border)" }} />
-      </svg>
-    </div>
-  )
-}
+// ── (ImgPlaceholder inlined in ProductCard) ──────────────
 
 // ── ProductCard ───────────────────────────────────────────
 function ProductCard({ product, onAdd }) {
   const [err, setErr] = useState(false)
   return (
     <button onClick={() => onAdd(product)}
-      className="card p-3 text-left transition-all duration-150 animate-fade-in active:scale-95 w-full group"
-      style={{ borderColor: "var(--border)" }}>
-      {product.imageUrl && !err
-        ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name} className="w-full h-20 object-cover rounded-md mb-2" />
-        : <ImgPlaceholder />}
-      <p className="text-xs font-semibold leading-tight line-clamp-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--text-primary)" }}>
-        {product.name}
-      </p>
-      <p className="font-mono font-bold text-sm mt-1" style={{ color: "var(--brand)" }}>
-        ${Number(product.price).toFixed(2)}
-      </p>
-      <p className="text-xs mt-0.5" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
-        Stock: {product.stock}
-      </p>
+      className="card text-left transition-all duration-150 animate-fade-in active:scale-95 w-full group overflow-hidden flex flex-col"
+      style={{ borderColor: "var(--border)", minHeight: "160px" }}>
+      {/* Imagen ocupa la mitad superior */}
+      <div className="w-full flex-1 relative" style={{ minHeight: "100px" }}>
+        {product.imageUrl && !err
+          ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name} className="w-full h-full object-cover absolute inset-0" />
+          : <div className="w-full h-full flex items-center justify-center absolute inset-0" style={{ background: "var(--bg-tertiary)" }}>
+              <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10">
+                <rect x="4" y="10" width="40" height="28" rx="3" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+                <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+                <path d="M4 32 L14 22 L22 30 L30 22 L44 36" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: "var(--border)" }} />
+              </svg>
+            </div>
+        }
+      </div>
+      {/* Info en la parte inferior */}
+      <div className="p-2.5 shrink-0">
+        <p className="text-sm font-semibold leading-tight line-clamp-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--text-primary)" }}>
+          {product.name}
+        </p>
+        <div className="flex items-center justify-between mt-1.5">
+          <p className="font-mono font-bold text-base" style={{ color: "var(--brand)" }}>
+            ${Number(product.price).toFixed(2)}
+          </p>
+          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
+            {product.stock} uds
+          </p>
+        </div>
+      </div>
     </button>
   )
 }
@@ -460,7 +463,7 @@ export default function POSPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {displayProducts.map(p => <ProductCard key={p.id} product={p} onAdd={handleAddToCart} />)}
               </div>
             )}
