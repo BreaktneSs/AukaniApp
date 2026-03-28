@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ordersService } from "@/services/orders.service"
 import { ClipboardList, Eye, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 
 const STATUS = {
@@ -28,7 +29,7 @@ function OrderDetail({ order, onClose }) {
             <div key={item.id} className="flex justify-between text-sm">
               <span style={{ color: "var(--text-primary)" }}>{item.product?.name} × {item.quantity}</span>
               <span className="font-mono" style={{ color: "var(--text-muted)" }}>
-                ${(Number(item.price) * item.quantity).toFixed(2)}
+                {formatCOP(Number(item.price) * item.quantity)}
               </span>
             </div>
           ))}
@@ -37,12 +38,12 @@ function OrderDetail({ order, onClose }) {
           {order.payments?.map(p => (
             <div key={p.id} className="flex justify-between text-sm">
               <span style={{ color: "var(--text-muted)" }}>{p.paymentMethod?.name}</span>
-              <span className="font-mono" style={{ color: "var(--text-primary)" }}>${Number(p.amount).toFixed(2)}</span>
+              <span className="font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(p.amount)}</span>
             </div>
           ))}
           <div className="flex justify-between font-bold pt-1">
             <span style={{ color: "var(--text-primary)" }}>Total</span>
-            <span className="font-mono" style={{ color: "var(--brand)" }}>${Number(order.total).toFixed(2)}</span>
+            <span className="font-mono" style={{ color: "var(--brand)" }}>{formatCOP(order.total)}</span>
           </div>
         </div>
         <div className="mt-4 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -109,7 +110,7 @@ export default function SalesPage() {
                     </td>
                     <td className="px-4 py-3" style={{ color: "var(--text-primary)" }}>{o.user?.name}</td>
                     <td className="px-4 py-3 text-right font-mono font-bold" style={{ color: "var(--brand)" }}>
-                      ${Number(o.total).toFixed(2)}
+                      {formatCOP(o.total)}
                     </td>
                     <td className="px-4 py-3">
                       <span className="badge text-xs"
