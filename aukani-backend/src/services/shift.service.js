@@ -2,14 +2,49 @@ import prisma from "../config/prisma.js"
 
 export const shiftService = {
   async getOpenShift(userId) {
-    return prisma.shift.findFirst({
+    const shift = await prisma.shift.findFirst({
       where: { userId, status: "OPEN" },
       include: {
         user: { select: { id: true, name: true } },
         shiftPayments: { include: { paymentMethod: true } },
         _count: { select: { orders: true } },
+        orders: {
+          where: { status: "COMPLETED" },
+          select: {
+            payments: {
+              select: {
+                amount: true,
+                paymentMethod: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
     })
+
+    if (!shift) return null
+
+    // Calcular shiftPayments en tiempo real desde las órdenes
+    const livePaymentTotals = {}
+    for (const order of shift.orders || []) {
+      for (const payment of order.payments || []) {
+        const id = payment.paymentMethod?.id
+        if (!livePaymentTotals[id]) {
+          livePaymentTotals[id] = { total: 0, paymentMethod: payment.paymentMethod }
+        }
+        livePaymentTotals[id].total += Number(payment.amount)
+      }
+    }
+
+    const liveShiftPayments = Object.entries(livePaymentTotals).map(([id, data]) => ({
+      id: `live-${id}`,
+      paymentMethodId: Number(id),
+      total: data.total,
+      paymentMethod: data.paymentMethod,
+    }))
+
+    const { orders, ...rest } = shift
+    return { ...rest, shiftPayments: liveShiftPayments }
   },
 
   async openShift(userId, openingCash) {

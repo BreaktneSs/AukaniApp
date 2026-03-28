@@ -12,68 +12,40 @@ import {
   PlusCircle, Edit2, LogIn, LogOut,
 } from "lucide-react"
 import toast from "react-hot-toast"
-import { formatCOP } from "@/utils/currency"
+import { formatCOP, formatNumber } from "@/utils/currency"
 
 // ── (ImgPlaceholder inlined in ProductCard) ──────────────
 
 // ── ProductCard ───────────────────────────────────────────
 function ProductCard({ product, onAdd }) {
   const [err, setErr] = useState(false)
-
   return (
-    <button
-      onClick={() => onAdd(product)}
-      className="card w-full aspect-square flex flex-col overflow-hidden group transition-all duration-150 hover:scale-[1.02] active:scale-95"
-      style={{ borderColor: "var(--border)" }}
-    >
-      {/* Imagen */}
-      <div className="relative w-full h-[60%]">
-        {product.imageUrl && !err ? (
-          <img
-            src={`/api${product.imageUrl}`}
-            onError={() => setErr(true)}
-            alt={product.name}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{ background: "var(--bg-tertiary)" }}
-          >
-            <Package size={32} style={{ color: "var(--border)" }} />
-          </div>
-        )}
+    <button onClick={() => onAdd(product)}
+      className="card text-left transition-all duration-150 animate-fade-in active:scale-95 w-full group overflow-hidden flex flex-col"
+      style={{ borderColor: "var(--border)", minHeight: "160px" }}>
+      {/* Imagen ocupa la mitad superior */}
+      <div className="w-full flex-1 relative" style={{ minHeight: "100px" }}>
+        {product.imageUrl && !err
+          ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name} className="w-full h-full object-cover absolute inset-0" />
+          : <div className="w-full h-full flex items-center justify-center absolute inset-0" style={{ background: "var(--bg-tertiary)" }}>
+              <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10">
+                <rect x="4" y="10" width="40" height="28" rx="3" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+                <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+                <path d="M4 32 L14 22 L22 30 L30 22 L44 36" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: "var(--border)" }} />
+              </svg>
+            </div>
+        }
       </div>
-
-      {/* Info */}
-      <div className="flex flex-col justify-between flex-1 p-3">
-        {/* Nombre más grande */}
-        <p
-          className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-green-500 transition-colors"
-          style={{ color: "var(--text-primary)" }}
-        >
+      {/* Info en la parte inferior */}
+      <div className="p-2.5 shrink-0">
+        <p className="text-sm font-semibold leading-tight line-clamp-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--text-primary)" }}>
           {product.name}
         </p>
-
-        <div className="flex items-center justify-between mt-2">
-          {/* Precio más protagonista */}
-          <p
-            className="font-mono font-bold text-lg"
-            style={{ color: "var(--brand)" }}
-          >
+        <div className="flex items-center justify-between mt-1.5">
+          <p className="font-mono font-bold text-base" style={{ color: "var(--brand)" }}>
             {formatCOP(product.price)}
           </p>
-
-          {/* Stock más visible */}
-          <p
-            className="text-xs font-medium"
-            style={{
-              color:
-                product.stock <= product.minStock
-                  ? "var(--warning)"
-                  : "var(--text-muted)",
-            }}
-          >
+          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
             {product.stock} uds
           </p>
         </div>
@@ -154,8 +126,17 @@ function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onRename }) {
 
 // ── Pantalla apertura de turno ────────────────────────────
 function OpenShiftScreen({ onOpen, loading }) {
-  const [amount, setAmount] = useState("")
+  const [rawValue, setRawValue] = useState("")
   const { user } = useAuthStore()
+
+  // Parsear solo dígitos y formatear en tiempo real
+  const handleChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, "")
+    setRawValue(digits)
+  }
+
+  const numericValue = Number(rawValue) || 0
+  const displayValue = rawValue ? formatNumber(numericValue) : ""
 
   return (
     <div className="flex-1 flex items-center justify-center p-6">
@@ -169,20 +150,32 @@ function OpenShiftScreen({ onOpen, loading }) {
             Hola, <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
           </p>
         </div>
-        <form onSubmit={e => { e.preventDefault(); if (amount !== "") onOpen(Number(amount)) }} className="space-y-4">
+        <form onSubmit={e => { e.preventDefault(); if (numericValue > 0) onOpen(numericValue) }} className="space-y-4">
           <div>
             <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
               Efectivo inicial en caja
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm" style={{ color: "var(--text-muted)" }}>$</span>
-              <input type="number" min="0" step="1" required autoFocus
-                className="input pl-7 text-xl font-mono font-bold"
-                placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold" style={{ color: "var(--text-muted)" }}>$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                autoFocus
+                className="input pl-10 text-2xl font-mono font-bold text-right pr-4"
+                placeholder="0"
+                value={displayValue}
+                onChange={handleChange}
+              />
             </div>
-            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Cuenta el efectivo antes de empezar</p>
+            {numericValue > 0 && (
+              <p className="text-right text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                {formatCOP(numericValue)}
+              </p>
+            )}
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Cuenta el efectivo antes de empezar</p>
           </div>
-          <button type="submit" disabled={loading || amount === ""} className="btn-primary btn-lg w-full">
+          <button type="submit" disabled={loading || numericValue === 0} className="btn-primary btn-lg w-full">
             {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
             Abrir turno
           </button>
@@ -194,14 +187,22 @@ function OpenShiftScreen({ onOpen, loading }) {
 
 // ── Modal cierre de turno ─────────────────────────────────
 function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
-  const [closingCash, setClosingCash] = useState("")
+  const [rawClosing, setRawClosing] = useState("")
   const [notes, setNotes] = useState("")
+
+  const handleClosingChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, "")
+    setRawClosing(digits)
+  }
+
+  const closingCash = Number(rawClosing) || 0
+  const displayClosing = rawClosing ? formatNumber(closingCash) : ""
 
   const cashPayment = shift?.shiftPayments?.find(p => p.paymentMethod?.name === "Efectivo")
   const cashSales = Number(cashPayment?.total || 0)
   const openingCash = Number(shift?.openingCash || 0)
   const expectedCash = openingCash + cashSales
-  const difference = closingCash !== "" ? Number(closingCash) - expectedCash : null
+  const difference = rawClosing !== "" ? closingCash - expectedCash : null
   const totalSales = (shift?.shiftPayments || []).reduce((s, p) => s + Number(p.total), 0)
 
   const duration = shift?.openedAt ? Math.round((Date.now() - new Date(shift.openedAt)) / 60000) : 0
@@ -254,16 +255,23 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
           </div>
         </div>
 
-        <form onSubmit={e => { e.preventDefault(); onConfirm({ closingCash: Number(closingCash), notes }) }} className="space-y-3">
+        <form onSubmit={e => { e.preventDefault(); onConfirm({ closingCash, notes }) }} className="space-y-3">
           <div>
             <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
               Efectivo contado en caja *
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm" style={{ color: "var(--text-muted)" }}>$</span>
-              <input type="number" min="0" step="1" required autoFocus
-                className="input pl-7 text-lg font-mono font-bold"
-                placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-bold" style={{ color: "var(--text-muted)" }}>$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                autoFocus
+                className="input pl-8 text-lg font-mono font-bold text-right pr-3"
+                placeholder="0"
+                value={displayClosing}
+                onChange={handleClosingChange}
+              />
             </div>
           </div>
 
@@ -288,7 +296,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
-            <button type="submit" disabled={loading} className="btn-md flex-1 text-white font-semibold" style={{ background: "var(--danger)" }}>
+            <button type="submit" disabled={loading || rawClosing === ""} className="btn-md flex-1 text-white font-semibold" style={{ background: "var(--danger)" }}>
               {loading ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
               Cerrar turno
             </button>
@@ -315,11 +323,12 @@ export default function POSPage() {
   const total = getTotal()
 
   // Turno
-  const { data: shift, isLoading: shiftLoading } = useQuery({
+  const { data: shift, isLoading: shiftLoading, refetch: refetchShift } = useQuery({
     queryKey: ["shift-mine"],
     queryFn: shiftsService.getMine,
     retry: false,
     refetchOnWindowFocus: false,
+    refetchInterval: 60_000, // Actualiza cada minuto automáticamente
   })
   useEffect(() => { if (shift?.id) setShift(shift.id) }, [shift])
 
@@ -341,12 +350,13 @@ export default function POSPage() {
   const { data: searchData, isFetching } = useQuery({
     queryKey: ["products-search", query],
     queryFn: () => productsService.getAll({ search: query, limit: 50 }),
-    enabled: query.length >= 2,
+    enabled: query.length >= 1,
+    staleTime: 0,
   })
   const searchResults = searchData?.products || []
 
   // Productos a mostrar + filtro categoría
-  const base = query.length >= 2 ? searchResults : allProducts
+  const base = query.length >= 1 ? searchResults : allProducts
   const displayProducts = selectedCategory
     ? base.filter(p => String(p.categoryId) === selectedCategory)
     : base
@@ -377,7 +387,15 @@ export default function POSPage() {
   // Cerrar turno
   const closeShiftMut = useMutation({
     mutationFn: (data) => shiftsService.close(shift.id, data),
-    onSuccess: () => { setShift(null); qc.invalidateQueries({ queryKey: ["shift-mine"] }); setShowCloseShift(false); toast.success("Turno cerrado") },
+    onSuccess: () => {
+      setShift(null)
+      setShowCloseShift(false)
+      setShowPayment(false)
+      // Invalidar y forzar refetch para que aparezca la pantalla de apertura
+      qc.removeQueries({ queryKey: ["shift-mine"] })
+      qc.invalidateQueries({ queryKey: ["shift-mine"] })
+      toast.success("Turno cerrado correctamente")
+    },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
 
@@ -402,12 +420,19 @@ export default function POSPage() {
   const handleSell = () => {
     if (!shiftId) { toast.error("Abre un turno antes de vender"); return }
     if (items.length === 0) return
-    const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
+    const paid = payments.reduce((s, p) => s + (p.amount || 0), 0)
     if (paid < total) { toast.error(`Falta ${formatCOP(total - paid)} por pagar`); return }
     createSale({
       shiftId,
       items: items.map(i => ({ productId: i.id, quantity: i.quantity })),
-      payments: payments.filter(p => Number(p.amount) > 0).map(p => ({ paymentMethodId: p.paymentMethodId, amount: Number(p.amount) })),
+      // Enviar solo el valor de la venta por método, no lo que el cliente pagó de más
+      payments: payments
+        .filter(p => (p.amount || 0) > 0)
+        .map(p => ({
+          paymentMethodId: p.paymentMethodId,
+          // Si hay un solo método de pago y hay cambio, registrar solo el total de la venta
+          amount: p.amount,
+        })),
     })
   }
 
@@ -452,7 +477,7 @@ export default function POSPage() {
                 </button>
               )}
             </div>
-            <button onClick={() => setShowCloseShift(true)}
+            <button onClick={() => { refetchShift(); setShowCloseShift(true) }}
               className="btn-md shrink-0 flex items-center gap-1.5 text-sm font-medium"
               style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
               <LogOut size={15} />
@@ -534,24 +559,35 @@ export default function POSPage() {
               <div className="space-y-2.5 animate-slide-up">
                 {paymentMethods.filter(m => m.active).map(method => {
                   const p = payments.find(x => x.paymentMethodId === method.id)
+                  const rawAmt = p?.rawAmount || ""
+                  const displayAmt = rawAmt ? formatNumber(Number(rawAmt)) : ""
                   return (
                     <div key={method.id} className="flex items-center gap-2">
                       <label className="text-xs w-20 shrink-0 font-medium" style={{ color: "var(--text-secondary)" }}>{method.name}</label>
-                      <input type="number" className="input text-sm font-mono" placeholder="0.00" min="0" step="1"
-                        value={p?.amount || ""}
-                        onChange={e => {
-                          const val = e.target.value
-                          setPayments(prev => {
-                            const exists = prev.find(x => x.paymentMethodId === method.id)
-                            if (exists) return prev.map(x => x.paymentMethodId === method.id ? { ...x, amount: val } : x)
-                            return [...prev, { paymentMethodId: method.id, amount: val }]
-                          })
-                        }} />
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: "var(--text-muted)" }}>$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="input text-sm font-mono font-bold pl-6 text-right"
+                          placeholder="0"
+                          value={displayAmt}
+                          onChange={e => {
+                            const digits = e.target.value.replace(/\D/g, "")
+                            setPayments(prev => {
+                              const exists = prev.find(x => x.paymentMethodId === method.id)
+                              const updated = { paymentMethodId: method.id, amount: Number(digits) || 0, rawAmount: digits }
+                              if (exists) return prev.map(x => x.paymentMethodId === method.id ? updated : x)
+                              return [...prev, updated]
+                            })
+                          }}
+                        />
+                      </div>
                     </div>
                   )
                 })}
                 {(() => {
-                  const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
+                  const paid = payments.reduce((s, p) => s + (p.amount || 0), 0)
                   const change = paid - total
                   return paid > 0 ? (
                     <div className="flex justify-between text-sm pt-1 border-t" style={{ borderColor: "var(--border)" }}>

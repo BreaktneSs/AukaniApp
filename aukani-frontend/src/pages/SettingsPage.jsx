@@ -162,32 +162,111 @@ function UsersTab() {
 }
 
 // ── Catálogos simples (categorías y métodos de pago) ──────
-function SimpleListTab({ queryKey, fetchFn, createFn, deleteFn, label }) {
+function SimpleListTab({ queryKey, fetchFn, createFn, deleteFn, label, minItems = 0 }) {
   const [name, setName] = useState("")
   const qc = useQueryClient()
   const { data = [], isLoading } = useQuery({ queryKey: [queryKey], queryFn: fetchFn })
-  const create = useMutation({ mutationFn: () => createFn(name), onSuccess: () => { toast.success(`${label} creado`); qc.invalidateQueries({ queryKey: [queryKey] }); setName("") }, onError: e => toast.error(e.response?.data?.error || "Error") })
-  const remove = useMutation({ mutationFn: deleteFn, onSuccess: () => { toast.success(`${label} eliminado`); qc.invalidateQueries({ queryKey: [queryKey] }) }, onError: e => toast.error(e.response?.data?.error || "Error") })
+
+  const activeItems = data.filter(item => item.active !== false)
+
+  const create = useMutation({
+    mutationFn: () => createFn(name),
+    onSuccess: () => {
+      toast.success(`${label} creado`)
+      qc.invalidateQueries({ queryKey: [queryKey] })
+      qc.invalidateQueries({ queryKey: ["payment-methods"] })
+      setName("")
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  const remove = useMutation({
+    mutationFn: deleteFn,
+    onSuccess: () => {
+      toast.success(`${label} eliminado`)
+      qc.invalidateQueries({ queryKey: [queryKey] })
+      qc.invalidateQueries({ queryKey: ["payment-methods"] })
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  const handleDelete = (item) => {
+    if (activeItems.length <= minItems) {
+      toast.error(`Debe haber al menos ${minItems} ${label.toLowerCase()}`)
+      return
+    }
+    if (confirm(`¿Eliminar "${item.name}"?`)) remove.mutate(item.id)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && name.trim()) create.mutate()
+  }
 
   return (
     <div className="space-y-3 max-w-sm">
       <div className="flex gap-2">
-        <input className="input" placeholder={`Nuevo ${label.toLowerCase()}...`} value={name} onChange={e => setName(e.target.value)} />
-        <button onClick={() => create.mutate()} disabled={!name || create.isPending} className="btn-primary btn-md shrink-0">
-          <Plus size={15} />
+        <input
+          className="input"
+          placeholder={`Nuevo ${label.toLowerCase()}...`}
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          onClick={() => create.mutate()}
+          disabled={!name.trim() || create.isPending}
+          className="btn-primary btn-md shrink-0">
+          {create.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={15} />}
         </button>
       </div>
-      {isLoading ? <Loader2 className="animate-spin" style={{ color: "var(--text-muted)" }} /> : (
-        <div className="space-y-1.5">
-          {data.map(item => (
-            <div key={item.id} className="card px-3 py-2 flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--text-primary)" }}>{item.name}</span>
-              <button onClick={() => { if (confirm(`¿Eliminar "${item.name}"?`)) remove.mutate(item.id) }}
-                className="btn-ghost w-6 h-6 rounded text-xs flex items-center justify-center"
-                style={{ color: "var(--danger)" }}>✕</button>
-            </div>
-          ))}
+
+      {isLoading ? (
+        <div className="flex justify-center py-4">
+          <Loader2 size={18} className="animate-spin" style={{ color: "var(--text-muted)" }} />
         </div>
+      ) : activeItems.length === 0 ? (
+        <p className="text-sm text-center py-4" style={{ color: "var(--text-muted)" }}>
+          No hay {label.toLowerCase()}s registradas
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {activeItems.map((item, idx) => {
+            const isLast = activeItems.length <= minItems
+            return (
+              <div key={item.id} className="card px-3 py-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                    {item.name}
+                  </span>
+                  {isLast && (
+                    <span className="badge text-xs px-1.5"
+                      style={{ background: "var(--brand-light)", color: "var(--brand)" }}>
+                      requerido
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(item)}
+                  disabled={isLast || remove.isPending}
+                  title={isLast ? `Debe haber al menos ${minItems}` : `Eliminar ${item.name}`}
+                  className="w-6 h-6 rounded flex items-center justify-center transition-opacity"
+                  style={{
+                    color: "var(--danger)",
+                    opacity: isLast ? 0.3 : 1,
+                    cursor: isLast ? "not-allowed" : "pointer",
+                  }}>
+                  ✕
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {minItems > 0 && (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          * Debe haber al menos {minItems} {label.toLowerCase()} activo
+        </p>
       )}
     </div>
   )
@@ -219,7 +298,7 @@ export default function SettingsPage() {
         {tab === 0 && <ShiftTab />}
         {tab === 1 && isAdmin && <UsersTab />}
         {tab === (isAdmin ? 2 : 1) && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
-        {tab === (isAdmin ? 3 : 2) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" />}
+        {tab === (isAdmin ? 3 : 2) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
       </div>
     </div>
   )
