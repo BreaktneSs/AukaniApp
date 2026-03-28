@@ -12,39 +12,68 @@ import {
   PlusCircle, Edit2, LogIn, LogOut,
 } from "lucide-react"
 import toast from "react-hot-toast"
+import { formatCOP } from "@/utils/currency"
 
 // ── (ImgPlaceholder inlined in ProductCard) ──────────────
 
 // ── ProductCard ───────────────────────────────────────────
 function ProductCard({ product, onAdd }) {
   const [err, setErr] = useState(false)
+
   return (
-    <button onClick={() => onAdd(product)}
-      className="card text-left transition-all duration-150 animate-fade-in active:scale-95 w-full group overflow-hidden flex flex-col"
-      style={{ borderColor: "var(--border)", minHeight: "160px" }}>
-      {/* Imagen ocupa la mitad superior */}
-      <div className="w-full flex-1 relative" style={{ minHeight: "100px" }}>
-        {product.imageUrl && !err
-          ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name} className="w-full h-full object-cover absolute inset-0" />
-          : <div className="w-full h-full flex items-center justify-center absolute inset-0" style={{ background: "var(--bg-tertiary)" }}>
-              <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10">
-                <rect x="4" y="10" width="40" height="28" rx="3" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
-                <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
-                <path d="M4 32 L14 22 L22 30 L30 22 L44 36" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: "var(--border)" }} />
-              </svg>
-            </div>
-        }
+    <button
+      onClick={() => onAdd(product)}
+      className="card w-full aspect-square flex flex-col overflow-hidden group transition-all duration-150 hover:scale-[1.02] active:scale-95"
+      style={{ borderColor: "var(--border)" }}
+    >
+      {/* Imagen */}
+      <div className="relative w-full h-[60%]">
+        {product.imageUrl && !err ? (
+          <img
+            src={`/api${product.imageUrl}`}
+            onError={() => setErr(true)}
+            alt={product.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ background: "var(--bg-tertiary)" }}
+          >
+            <Package size={32} style={{ color: "var(--border)" }} />
+          </div>
+        )}
       </div>
-      {/* Info en la parte inferior */}
-      <div className="p-2.5 shrink-0">
-        <p className="text-sm font-semibold leading-tight line-clamp-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--text-primary)" }}>
+
+      {/* Info */}
+      <div className="flex flex-col justify-between flex-1 p-3">
+        {/* Nombre más grande */}
+        <p
+          className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-green-500 transition-colors"
+          style={{ color: "var(--text-primary)" }}
+        >
           {product.name}
         </p>
-        <div className="flex items-center justify-between mt-1.5">
-          <p className="font-mono font-bold text-base" style={{ color: "var(--brand)" }}>
-            ${Number(product.price).toFixed(2)}
+
+        <div className="flex items-center justify-between mt-2">
+          {/* Precio más protagonista */}
+          <p
+            className="font-mono font-bold text-lg"
+            style={{ color: "var(--brand)" }}
+          >
+            {formatCOP(product.price)}
           </p>
-          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
+
+          {/* Stock más visible */}
+          <p
+            className="text-xs font-medium"
+            style={{
+              color:
+                product.stock <= product.minStock
+                  ? "var(--warning)"
+                  : "var(--text-muted)",
+            }}
+          >
             {product.stock} uds
           </p>
         </div>
@@ -59,7 +88,7 @@ function CartItem({ item, onUpdate, onRemove }) {
     <div className="flex items-center gap-2 py-2.5 border-b animate-fade-in" style={{ borderColor: "var(--border)" }}>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
-        <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>${Number(item.price).toFixed(2)}</p>
+        <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{formatCOP(item.price)}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button onClick={() => onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
@@ -67,7 +96,7 @@ function CartItem({ item, onUpdate, onRemove }) {
         <button onClick={() => onUpdate(item.id, item.quantity + 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Plus size={11} /></button>
       </div>
       <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
-        ${(Number(item.price) * item.quantity).toFixed(2)}
+        {formatCOP(Number(item.price) * item.quantity)}
       </p>
       <button onClick={() => onRemove(item.id)} className="btn-ghost w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ color: "var(--danger)" }}>
         <Trash2 size={11} />
@@ -147,7 +176,7 @@ function OpenShiftScreen({ onOpen, loading }) {
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm" style={{ color: "var(--text-muted)" }}>$</span>
-              <input type="number" min="0" step="0.01" required autoFocus
+              <input type="number" min="0" step="1" required autoFocus
                 className="input pl-7 text-xl font-mono font-bold"
                 placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
             </div>
@@ -198,7 +227,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
             </div>
             <div className="text-right">
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>Ventas totales</p>
-              <p className="font-mono font-bold" style={{ color: "var(--brand)" }}>${totalSales.toFixed(2)}</p>
+              <p className="font-mono font-bold" style={{ color: "var(--brand)" }}>{formatCOP(totalSales)}</p>
             </div>
           </div>
 
@@ -207,7 +236,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
             {shift?.shiftPayments?.length > 0 ? shift.shiftPayments.map(p => (
               <div key={p.id} className="flex justify-between text-sm">
                 <span style={{ color: "var(--text-secondary)" }}>{p.paymentMethod?.name}</span>
-                <span className="font-mono font-medium" style={{ color: "var(--text-primary)" }}>${Number(p.total).toFixed(2)}</span>
+                <span className="font-mono font-medium" style={{ color: "var(--text-primary)" }}>{formatCOP(p.total)}</span>
               </div>
             )) : <p className="text-xs" style={{ color: "var(--text-muted)" }}>Sin ventas registradas</p>}
           </div>
@@ -217,10 +246,10 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
               <div>
                 <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Efectivo esperado</p>
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Apertura ${openingCash.toFixed(2)} + ventas efectivo ${cashSales.toFixed(2)}
+                  Apertura {formatCOP(openingCash)} + ventas efectivo {formatCOP(cashSales)}
                 </p>
               </div>
-              <p className="font-mono font-bold text-lg" style={{ color: "var(--brand)" }}>${expectedCash.toFixed(2)}</p>
+              <p className="font-mono font-bold text-lg" style={{ color: "var(--brand)" }}>{formatCOP(expectedCash)}</p>
             </div>
           </div>
         </div>
@@ -232,7 +261,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm" style={{ color: "var(--text-muted)" }}>$</span>
-              <input type="number" min="0" step="0.01" required autoFocus
+              <input type="number" min="0" step="1" required autoFocus
                 className="input pl-7 text-lg font-mono font-bold"
                 placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
             </div>
@@ -246,7 +275,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
               </span>
               {Math.abs(difference) >= 0.01 && (
                 <span className="font-mono font-bold" style={{ color: difference > 0 ? "var(--brand)" : "var(--danger)" }}>
-                  ${Math.abs(difference).toFixed(2)}
+                  {formatCOP(Math.abs(difference))}
                 </span>
               )}
             </div>
@@ -357,7 +386,7 @@ export default function POSPage() {
     mutationFn: ordersService.createSale,
     onSuccess: (data) => {
       const change = data.change || 0
-      toast.success(`✅ Venta registrada${change > 0 ? ` · Cambio: $${change.toFixed(2)}` : ""}`)
+      toast.success(`✅ Venta registrada${change > 0 ? ` · Cambio: ${formatCOP(change)}` : ""}`)
       closeSale(activeId); setShowPayment(false)
       qc.invalidateQueries({ queryKey: ["products-all"] })
       qc.invalidateQueries({ queryKey: ["shift-mine"] })
@@ -374,7 +403,7 @@ export default function POSPage() {
     if (!shiftId) { toast.error("Abre un turno antes de vender"); return }
     if (items.length === 0) return
     const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
-    if (paid < total) { toast.error(`Falta $${(total - paid).toFixed(2)} por pagar`); return }
+    if (paid < total) { toast.error(`Falta ${formatCOP(total - paid)} por pagar`); return }
     createSale({
       shiftId,
       items: items.map(i => ({ productId: i.id, quantity: i.quantity })),
@@ -494,7 +523,7 @@ export default function POSPage() {
           <div className="p-4 border-t space-y-3" style={{ borderColor: "var(--border)" }}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>Total</span>
-              <span className="font-display font-bold text-2xl font-mono" style={{ color: "var(--text-primary)" }}>${total.toFixed(2)}</span>
+              <span className="font-display font-bold text-2xl font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(total)}</span>
             </div>
 
             {!showPayment ? (
@@ -508,7 +537,7 @@ export default function POSPage() {
                   return (
                     <div key={method.id} className="flex items-center gap-2">
                       <label className="text-xs w-20 shrink-0 font-medium" style={{ color: "var(--text-secondary)" }}>{method.name}</label>
-                      <input type="number" className="input text-sm font-mono" placeholder="0.00" min="0" step="0.01"
+                      <input type="number" className="input text-sm font-mono" placeholder="0.00" min="0" step="1"
                         value={p?.amount || ""}
                         onChange={e => {
                           const val = e.target.value
@@ -527,7 +556,7 @@ export default function POSPage() {
                   return paid > 0 ? (
                     <div className="flex justify-between text-sm pt-1 border-t" style={{ borderColor: "var(--border)" }}>
                       <span style={{ color: "var(--text-muted)" }}>Cambio</span>
-                      <span className="font-mono font-bold" style={{ color: change >= 0 ? "var(--brand)" : "var(--danger)" }}>${change.toFixed(2)}</span>
+                      <span className="font-mono font-bold" style={{ color: change >= 0 ? "var(--brand)" : "var(--danger)" }}>{formatCOP(change)}</span>
                     </div>
                   ) : null
                 })()}

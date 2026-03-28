@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ordersService } from "@/services/orders.service"
 import { inventoryService } from "@/services/inventory.service"
 import { TrendingUp, ShoppingCart, AlertTriangle, DollarSign, Loader2 } from "lucide-react"
+import { formatCOP } from "@/utils/currency"
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
@@ -45,10 +46,10 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={DollarSign} label="Ventas del día" value={`$${Number(summary?.totalRevenue || 0).toFixed(2)}`} color="var(--brand)" />
+          <StatCard icon={DollarSign} label="Ventas del día" value={formatCOP(summary?.totalRevenue || 0)} color="var(--brand)" />
           <StatCard icon={ShoppingCart} label="Transacciones" value={summary?.totalOrders || 0} color="var(--info)" sub="órdenes completadas" />
           <StatCard icon={TrendingUp} label="Ticket promedio"
-            value={summary?.totalOrders > 0 ? `$${(summary.totalRevenue / summary.totalOrders).toFixed(2)}` : "$0.00"}
+            value={summary?.totalOrders > 0 ? formatCOP(summary.totalRevenue / summary.totalOrders) : formatCOP(0)}
             color="var(--warning)" />
           <StatCard icon={AlertTriangle} label="Stock bajo" value={lowStock.length} color="var(--danger)"
             sub={lowStock.length > 0 ? "productos bajo mínimo" : "todo en orden"} />

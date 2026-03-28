@@ -5,6 +5,7 @@ import {
   Users, Clock, DollarSign, TrendingUp, CheckCircle,
   XCircle, Eye, Loader2, AlertTriangle, X, LogOut
 } from "lucide-react"
+import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 
 // ── Detalle de turno ──────────────────────────────────────
@@ -59,14 +60,14 @@ function ShiftDetailModal({ shiftId, onClose }) {
       {/* Resumen financiero */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         {[
-          { label: "Apertura", value: `$${Number(shift.openingCash).toFixed(2)}`, color: "var(--text-primary)" },
-          { label: "Ventas totales", value: `$${totalSales.toFixed(2)}`, color: "var(--brand)" },
-          { label: "Efectivo esperado", value: `$${expectedCash.toFixed(2)}`, color: "var(--info)" },
+          { label: "Apertura", value: `${formatCOP(shift.openingCash)}`, color: "var(--text-primary)" },
+          { label: "Ventas totales", value: `${formatCOP(totalSales)}`, color: "var(--brand)" },
+          { label: "Efectivo esperado", value: `${formatCOP(expectedCash)}`, color: "var(--info)" },
           ...(shift.closingCash != null ? [
-            { label: "Efectivo contado", value: `$${Number(shift.closingCash).toFixed(2)}`, color: "var(--text-primary)" },
+            { label: "Efectivo contado", value: `${formatCOP(shift.closingCash)}`, color: "var(--text-primary)" },
             {
               label: Number(shift.difference) >= 0 ? "Sobrante" : "Faltante",
-              value: `$${Math.abs(Number(shift.difference)).toFixed(2)}`,
+              value: `${formatCOP(Math.abs(Number(shift.difference)))}`,
               color: Number(shift.difference) >= 0 ? "var(--brand)" : "var(--danger)"
             },
           ] : []),
@@ -85,7 +86,7 @@ function ShiftDetailModal({ shiftId, onClose }) {
           {shift.shiftPayments.map(p => (
             <div key={p.id} className="flex justify-between text-sm">
               <span style={{ color: "var(--text-secondary)" }}>{p.paymentMethod?.name}</span>
-              <span className="font-mono font-bold" style={{ color: "var(--brand)" }}>${Number(p.total).toFixed(2)}</span>
+              <span className="font-mono font-bold" style={{ color: "var(--brand)" }}>{formatCOP(p.total)}</span>
             </div>
           ))}
         </div>
@@ -110,7 +111,7 @@ function ShiftDetailModal({ shiftId, onClose }) {
                     {order.status === "COMPLETED" ? "OK" : "Cancelada"}
                   </span>
                 </div>
-                <span className="font-mono font-bold" style={{ color: "var(--brand)" }}>${Number(order.total).toFixed(2)}</span>
+                <span className="font-mono font-bold" style={{ color: "var(--brand)" }}>{formatCOP(order.total)}</span>
               </div>
             ))}
           </div>
@@ -169,19 +170,19 @@ function ActiveShiftCard({ shift, onView }) {
         <div className="text-center rounded-lg p-2" style={{ background: "var(--bg-primary)" }}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>Apertura</p>
           <p className="font-mono font-bold text-sm" style={{ color: "var(--text-primary)" }}>
-            ${Number(shift.openingCash).toFixed(2)}
+            {formatCOP(shift.openingCash)}
           </p>
         </div>
         <div className="text-center rounded-lg p-2" style={{ background: "var(--bg-primary)" }}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>Ventas</p>
           <p className="font-mono font-bold text-sm" style={{ color: "var(--brand)" }}>
-            ${totalSales.toFixed(2)}
+            {formatCOP(totalSales)}
           </p>
         </div>
         <div className="text-center rounded-lg p-2" style={{ background: "var(--bg-primary)" }}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>Debe haber</p>
           <p className="font-mono font-bold text-sm" style={{ color: "var(--info)" }}>
-            ${expectedCash.toFixed(2)}
+            {formatCOP(expectedCash)}
           </p>
         </div>
       </div>
@@ -192,7 +193,7 @@ function ActiveShiftCard({ shift, onView }) {
           {shift.shiftPayments.map(p => (
             <div key={p.id} className="flex justify-between text-xs">
               <span style={{ color: "var(--text-secondary)" }}>{p.paymentMethod?.name}</span>
-              <span className="font-mono" style={{ color: "var(--text-primary)" }}>${Number(p.total).toFixed(2)}</span>
+              <span className="font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(p.total)}</span>
             </div>
           ))}
         </div>
@@ -260,14 +261,14 @@ export default function ShiftsPage() {
             <TrendingUp size={14} style={{ color: "var(--brand)" }} />
             <span className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Ventas en curso</span>
           </div>
-          <p className="font-display font-bold text-3xl font-mono" style={{ color: "var(--brand)" }}>${totalActive.toFixed(2)}</p>
+          <p className="font-display font-bold text-3xl font-mono" style={{ color: "var(--brand)" }}>{formatCOP(totalActive)}</p>
         </div>
         <div className="card p-4 space-y-1 col-span-2 md:col-span-1">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={14} style={{ color: "var(--info)" }} />
             <span className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Efectivo esperado total</span>
           </div>
-          <p className="font-display font-bold text-3xl font-mono" style={{ color: "var(--info)" }}>${totalCashActive.toFixed(2)}</p>
+          <p className="font-display font-bold text-3xl font-mono" style={{ color: "var(--info)" }}>{formatCOP(totalCashActive)}</p>
         </div>
       </div>
 
@@ -328,16 +329,16 @@ export default function ShiftsPage() {
                           {new Date(s.openedAt).toLocaleDateString()} {new Date(s.openedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
-                          ${Number(s.openingCash).toFixed(2)}
+                          {formatCOP(s.openingCash)}
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: "var(--brand)" }}>
-                          ${totalSales.toFixed(2)}
+                          {formatCOP(totalSales)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           {s.difference != null ? (
                             <span className="badge font-mono text-xs"
                               style={{ background: Math.abs(diff) < 0.01 ? "var(--brand-light)" : diff > 0 ? "var(--brand-light)" : "var(--danger-light)", color: Math.abs(diff) < 0.01 ? "var(--brand)" : diff > 0 ? "var(--brand)" : "var(--danger)" }}>
-                              {Math.abs(diff) < 0.01 ? "✅" : diff > 0 ? `+$${diff.toFixed(2)}` : `-$${Math.abs(diff).toFixed(2)}`}
+                              {Math.abs(diff) < 0.01 ? "✅" : diff > 0 ? `+${formatCOP(diff)}` : `-${formatCOP(Math.abs(diff))}`}
                             </span>
                           ) : <span style={{ color: "var(--text-muted)" }}>—</span>}
                         </td>

@@ -6,6 +6,7 @@ import { categoriesService, paymentMethodsService } from "@/services/catalog.ser
 import { useAuthStore } from "@/store/auth.store"
 import { useCartStore } from "@/store/cart.store"
 import { Plus, Loader2, CheckCircle, XCircle } from "lucide-react"
+import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 
 const TABS = ["Turno de caja", "Usuarios", "Categorías", "Métodos de pago"]
@@ -45,7 +46,7 @@ function ShiftTab() {
             </div>
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--text-muted)" }}>Apertura</span>
-              <span className="font-mono" style={{ color: "var(--text-primary)" }}>${Number(shift.openingCash).toFixed(2)}</span>
+              <span className="font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(shift.openingCash)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--text-muted)" }}>Inicio</span>
