@@ -2,11 +2,15 @@ import { productService } from "../services/product.service.js"
 
 export const productController = {
   async getAll(req, reply) {
-    const { page, limit, category, active } = req.query
+    const { page, limit, search, categoryId, minPrice, maxPrice, lowStock, active } = req.query
     const result = await productService.getAll({
       page: Number(page) || 1,
-      limit: Number(limit) || 50,
-      category,
+      limit: Number(limit) || 200,
+      search: search || undefined,
+      categoryId: categoryId || undefined,
+      minPrice: minPrice || undefined,
+      maxPrice: maxPrice || undefined,
+      lowStock: lowStock || undefined,
       active: active === "false" ? false : true,
     })
     return reply.send(result)
@@ -24,10 +28,11 @@ export const productController = {
     return reply.send(product)
   },
 
+  // /products/search?q= ahora también devuelve { products, total }
   async search(req, reply) {
     const { q } = req.query
-    const results = await productService.search(q)
-    return reply.send(results)
+    const result = await productService.getAll({ search: q || "", limit: 50 })
+    return reply.send(result)
   },
 
   async create(req, reply) {
