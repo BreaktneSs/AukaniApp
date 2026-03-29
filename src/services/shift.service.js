@@ -86,7 +86,14 @@ export const shiftService = {
       total,
     }))
 
+    // Cerrar sub-turnos (cajas remotas) asociados a esta caja
+    const openSubShifts = await prisma.subShift.findMany({
+      where: { parentShiftId: shiftId, status: "OPEN" },
+      select: { id: true },
+    })
+
     const [closedShift] = await prisma.$transaction([
+      // Cerrar la caja principal
       prisma.shift.update({
         where: { id: shiftId },
         data: { status: "CLOSED", closingCash, expectedCash, difference, notes, closedAt: new Date() },
@@ -95,6 +102,20 @@ export const shiftService = {
           user: { select: { id: true, name: true } },
         },
       }),
+      // Cerrar todos los sub-turnos abiertos
+      prisma.subShift.updateMany({
+        where: { parentShiftId: shiftId, status: "OPEN" },
+        data: { status: "CLOSED", closedAt: new Date() },
+      }),
+      // Cancelar pedidos pendientes de despacho de esas cajas remotas
+      prisma.dispatchOrder.updateMany({
+        where: {
+          subShiftId: { in: openSubShifts.map(s => s.id) },
+          status: "PENDING",
+        },
+        data: { status: "CANCELLED" },
+      }),
+      // Upsert shiftPayments
       ...shiftPaymentData.map((sp) =>
         prisma.shiftPayment.upsert({
           where: { shiftId_paymentMethodId: { shiftId: sp.shiftId, paymentMethodId: sp.paymentMethodId } },
