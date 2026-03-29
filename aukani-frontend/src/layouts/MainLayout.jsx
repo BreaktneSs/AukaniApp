@@ -12,7 +12,6 @@ const nav = [
   { to: "/pos",       icon: ShoppingCart,    label: "Caja",          roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/waiter",    icon: Smartphone,      label: "Caja remota",   roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/dispatch",  icon: Bell,            label: "Despachos",     roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/products",  icon: Package,         label: "Productos",     roles: ["ADMIN","JEFE"] },
   { to: "/inventory", icon: Boxes,           label: "Inventario",    roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/sales",     icon: ClipboardList,   label: "Ventas",        roles: ["ADMIN","JEFE"] },
   { to: "/shifts",    icon: Landmark,        label: "Control caja",  roles: ["ADMIN","JEFE"] },
