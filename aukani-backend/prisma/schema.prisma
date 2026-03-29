@@ -44,9 +44,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  shifts    Shift[]
-  orders    Order[]
-  movements InventoryMovement[]
+  shifts     Shift[]
+  subShifts  SubShift[]
+  orders     Order[]
+  movements  InventoryMovement[]
 
   @@index([email])
   @@index([role])
@@ -92,9 +93,10 @@ model Product {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  category   Category?           @relation(fields: [categoryId], references: [id])
-  orderItems OrderItem[]
-  movements  InventoryMovement[]
+  category      Category?           @relation(fields: [categoryId], references: [id])
+  orderItems    OrderItem[]
+  movements     InventoryMovement[]
+  dispatchItems DispatchItem[]
 
   @@index([name])
   @@index([barcode])
@@ -119,6 +121,7 @@ model Shift {
   user          User           @relation(fields: [userId], references: [id])
   orders        Order[]
   shiftPayments ShiftPayment[]
+  subShifts     SubShift[]
 
   @@index([userId])
   @@index([status])
@@ -199,4 +202,66 @@ model InventoryMovement {
   @@index([productId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// ─── CAJAS SUBORDINADAS (meseros) ────────────────────────
+
+enum SubShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum DispatchStatus {
+  PENDING    // Mesero envió, cajero no ha visto
+  DISPATCHED // Cajero confirmó despacho
+  CANCELLED  // Cancelado
+}
+
+model SubShift {
+  id          Int            @id @default(autoincrement())
+  userId      Int            // Mesero
+  parentShiftId Int          // Caja principal a la que está vinculado
+  status      SubShiftStatus @default(OPEN)
+  openedAt    DateTime       @default(now())
+  closedAt    DateTime?
+
+  user        User           @relation(fields: [userId], references: [id])
+  parentShift Shift          @relation(fields: [parentShiftId], references: [id])
+  dispatches  DispatchOrder[]
+
+  @@index([userId])
+  @@index([parentShiftId])
+  @@index([status])
+}
+
+model DispatchOrder {
+  id           Int            @id @default(autoincrement())
+  subShiftId   Int
+  cashReceived Decimal        @db.Decimal(10, 2)  // Dinero que el mesero recibió del cliente
+  change       Decimal        @db.Decimal(10, 2)  // Vuelto que el cajero debe dar al mesero
+  total        Decimal        @db.Decimal(10, 2)  // Total de la venta
+  status       DispatchStatus @default(PENDING)
+  notes        String?
+  createdAt    DateTime       @default(now())
+  dispatchedAt DateTime?
+
+  subShift  SubShift            @relation(fields: [subShiftId], references: [id])
+  items     DispatchItem[]
+
+  @@index([subShiftId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DispatchItem {
+  id              Int    @id @default(autoincrement())
+  dispatchOrderId Int
+  productId       Int
+  quantity        Int
+  price           Decimal @db.Decimal(10, 2)
+
+  dispatchOrder DispatchOrder @relation(fields: [dispatchOrderId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([dispatchOrderId])
 }

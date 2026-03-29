@@ -11,6 +11,8 @@ import SalesPage from "@/pages/SalesPage"
 import DashboardPage from "@/pages/DashboardPage"
 import SettingsPage from "@/pages/SettingsPage"
 import ShiftsPage from "@/pages/ShiftsPage"
+import WaiterPage from "@/pages/WaiterPage"
+import DispatchPage from "@/pages/DispatchPage"
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } })
 
@@ -23,17 +25,22 @@ export default function App() {
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/pos" replace />} />
             <Route path="/pos"       element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><POSPage /></ProtectedRoute>} />
+            <Route path="/waiter"    element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><WaiterPage /></ProtectedRoute>} />
+            <Route path="/dispatch"  element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><DispatchPage /></ProtectedRoute>} />
             <Route path="/products"  element={<ProtectedRoute roles={["ADMIN","JEFE"]}><ProductsPage /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><InventoryPage /></ProtectedRoute>} />
             <Route path="/sales"     element={<ProtectedRoute roles={["ADMIN","JEFE"]}><SalesPage /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute roles={["ADMIN","JEFE"]}><DashboardPage /></ProtectedRoute>} />
             <Route path="/shifts"    element={<ProtectedRoute roles={["ADMIN","JEFE"]}><ShiftsPage /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute roles={["ADMIN","JEFE"]}><DashboardPage /></ProtectedRoute>} />
             <Route path="/settings"  element={<ProtectedRoute roles={["ADMIN"]}><SettingsPage /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
       </BrowserRouter>
-      <Toaster position="top-right" toastOptions={{ style: { background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)", fontSize: "13px" }, duration: 3000 }} />
+      <Toaster position="top-right" toastOptions={{
+        style: { background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)", fontSize: "13px" },
+        duration: 3000,
+      }} />
     </QueryClientProvider>
   )
 }
