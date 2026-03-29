@@ -27,7 +27,6 @@ export default function App() {
             <Route path="/pos"       element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><POSPage /></ProtectedRoute>} />
             <Route path="/waiter"    element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><WaiterPage /></ProtectedRoute>} />
             <Route path="/dispatch"  element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><DispatchPage /></ProtectedRoute>} />
-            <Route path="/products"  element={<ProtectedRoute roles={["ADMIN","JEFE"]}><ProductsPage /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><InventoryPage /></ProtectedRoute>} />
             <Route path="/sales"     element={<ProtectedRoute roles={["ADMIN","JEFE"]}><SalesPage /></ProtectedRoute>} />
             <Route path="/shifts"    element={<ProtectedRoute roles={["ADMIN","JEFE"]}><ShiftsPage /></ProtectedRoute>} />
