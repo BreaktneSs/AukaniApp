@@ -1,10 +1,23 @@
 import prisma from "../config/prisma.js"
 
 export const productService = {
-  async getAll({ page = 1, limit = 50, category, active = true } = {}) {
+  async getAll({ page = 1, limit = 200, search, categoryId, minPrice, maxPrice, lowStock, active = true } = {}) {
     const skip = (page - 1) * limit
     const where = { active }
-    if (category) where.category = category
+
+    if (search && search.trim().length > 0) {
+      const s = search.trim()
+      where.OR = [
+        { name:    { contains: s, mode: "insensitive" } },
+        { sku:     { contains: s, mode: "insensitive" } },
+        // barcode es opcional — solo buscar si no es null
+        { barcode: { not: null, contains: s, mode: "insensitive" } },
+      ]
+    }
+
+    if (categoryId) where.categoryId = Number(categoryId)
+    if (minPrice !== undefined && minPrice !== "") where.price = { ...where.price, gte: Number(minPrice) }
+    if (maxPrice !== undefined && maxPrice !== "") where.price = { ...where.price, lte: Number(maxPrice) }
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -12,44 +25,49 @@ export const productService = {
         skip,
         take: limit,
         orderBy: { name: "asc" },
+        include: { category: { select: { id: true, name: true } } },
       }),
       prisma.product.count({ where }),
     ])
 
-    return { products, total, page, limit }
+    const filtered = lowStock === "true"
+      ? products.filter(p => p.stock <= p.minStock)
+      : products
+
+    return { products: filtered, total, page, limit }
   },
 
   async getById(id) {
-    return prisma.product.findUnique({ where: { id } })
-  },
-
-  async getByBarcode(barcode) {
-    return prisma.product.findUnique({ where: { barcode } })
-  },
-
-  async search(query) {
-    if (!query || query.trim().length === 0) return []
-
-    return prisma.product.findMany({
-      where: {
-        active: true,
-        OR: [
-          { name: { contains: query, mode: "insensitive" } },
-          { sku: { contains: query, mode: "insensitive" } },
-          { category: { contains: query, mode: "insensitive" } },
-        ],
-      },
-      take: 20,
-      orderBy: { name: "asc" },
+    return prisma.product.findUnique({
+      where: { id },
+      include: { category: { select: { id: true, name: true } } },
     })
   },
 
+  async getByBarcode(barcode) {
+    return prisma.product.findUnique({
+      where: { barcode },
+      include: { category: { select: { id: true, name: true } } },
+    })
+  },
+
+  async search(query) {
+    return (await this.getAll({ search: query, limit: 50 })).products
+  },
+
   async create(data) {
-    return prisma.product.create({ data })
+    return prisma.product.create({
+      data,
+      include: { category: { select: { id: true, name: true } } },
+    })
   },
 
   async update(id, data) {
-    return prisma.product.update({ where: { id }, data })
+    return prisma.product.update({
+      where: { id },
+      data,
+      include: { category: { select: { id: true, name: true } } },
+    })
   },
 
   async updateStock(id, quantity) {
@@ -60,10 +78,6 @@ export const productService = {
   },
 
   async delete(id) {
-    // Soft delete — never lose product history
-    return prisma.product.update({
-      where: { id },
-      data: { active: false },
-    })
+    return prisma.product.update({ where: { id }, data: { active: false } })
   },
 }
