@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useCartStore } from "@/store/cart.store"
 import { useAuthStore } from "@/store/auth.store"
 import { productsService } from "@/services/products.service"
 import { ordersService } from "@/services/orders.service"
 import { shiftsService } from "@/services/shifts.service"
+import { dispatchService } from "@/services/dispatch.service"
 import { paymentMethodsService, categoriesService } from "@/services/catalog.service"
 import {
   Search, X, Plus, Minus, Trash2, ShoppingCart,
   CreditCard, Banknote, Loader2, Package,
-  PlusCircle, Edit2, LogIn, LogOut,
+  PlusCircle, Edit2, LogIn, LogOut, Bell,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { formatCOP, formatNumber } from "@/utils/currency"
@@ -317,6 +319,7 @@ export default function POSPage() {
   const searchRef = useRef(null)
   const qc = useQueryClient()
 
+  const navigate = useNavigate()
   const { sales, activeId, shiftId, setShift, newSale, switchSale, closeSale, renameSale, addItem, removeItem, updateQuantity, clearActive, getActive, getTotal } = useCartStore()
   const active = getActive()
   const items = active?.items || []
@@ -331,6 +334,14 @@ export default function POSPage() {
     refetchInterval: 60_000, // Actualiza cada minuto automáticamente
   })
   useEffect(() => { if (shift?.id) setShift(shift.id) }, [shift])
+
+  // Pedidos de despacho pendientes — polling cada 5s
+  const { data: pendingDispatches = [] } = useQuery({
+    queryKey: ["dispatches-pending", shift?.id],
+    queryFn: () => dispatchService.getPendingDispatches(shift.id),
+    enabled: !!shift?.id,
+    refetchInterval: 5_000,
+  })
 
   // Métodos de pago
   const { data: paymentMethods = [] } = useQuery({ queryKey: ["payment-methods"], queryFn: paymentMethodsService.getAll })
@@ -463,7 +474,7 @@ export default function POSPage() {
         {/* Panel izquierdo */}
         <div className="flex-1 flex flex-col overflow-hidden p-3 gap-2">
 
-          {/* Búsqueda + cerrar turno */}
+          {/* Búsqueda + widget despachos + cerrar turno */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
@@ -477,6 +488,31 @@ export default function POSPage() {
                 </button>
               )}
             </div>
+
+            {/* Widget despachos pendientes */}
+            <button
+              onClick={() => navigate("/dispatch")}
+              className="relative shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-md font-medium text-sm transition-all duration-200"
+              style={{
+                background: pendingDispatches.length > 0 ? "var(--warning-light)" : "var(--bg-secondary)",
+                color: pendingDispatches.length > 0 ? "var(--warning)" : "var(--text-muted)",
+                border: `1px solid ${pendingDispatches.length > 0 ? "var(--warning)" : "var(--border)"}`,
+              }}
+              title="Ver despachos pendientes">
+              <Bell size={15} className={pendingDispatches.length > 0 ? "animate-pulse" : ""} />
+              {pendingDispatches.length > 0 && (
+                <>
+                  <span className="hidden sm:inline text-xs font-bold">
+                    {pendingDispatches.length} despacho{pendingDispatches.length !== 1 ? "s" : ""}
+                  </span>
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
+                    style={{ background: "var(--warning)", fontSize: "10px" }}>
+                    {pendingDispatches.length}
+                  </span>
+                </>
+              )}
+            </button>
+
             <button onClick={() => { refetchShift(); setShowCloseShift(true) }}
               className="btn-md shrink-0 flex items-center gap-1.5 text-sm font-medium"
               style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>

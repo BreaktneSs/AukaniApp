@@ -45,7 +45,7 @@ function LinkToCashierScreen({ onLink, loading }) {
             <LogIn size={28} style={{ color: "var(--brand)" }} />
           </div>
           <h2 className="font-display font-bold text-xl" style={{ color: "var(--text-primary)" }}>
-            Vincular a caja
+            Caja remota
           </h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Hola, <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
