@@ -12,6 +12,7 @@ import {
   ChevronDown, ChevronUp
 } from "lucide-react"
 import toast from "react-hot-toast"
+import { confirm } from "@/components/ui/ConfirmDialog"
 
 // ── Tipos de movimiento ───────────────────────────────────
 const TYPE = {
@@ -222,7 +223,7 @@ function ProductDrawer({ product, onClose, canExit, canEdit, onEntry, onExit, on
             {canEdit && (
               <>
                 <button onClick={() => onEdit(product)} className="btn-ghost w-7 h-7 rounded flex items-center justify-center"><Edit2 size={13} /></button>
-                <button onClick={() => { if (confirm(`¿Desactivar "${product.name}"?`)) onDelete(product.id) }} className="btn-ghost w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--danger)" }}><Trash2 size={13} /></button>
+                <button onClick={() => { confirm({ title: `¿Desactivar producto?`, message: `"${product.name}" quedará inactivo.`, confirmLabel: "Desactivar" }).then(ok => { if (ok) onDelete(product.id) }) }} className="btn-ghost w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--danger)" }}><Trash2 size={13} /></button>
               </>
             )}
             <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center ml-1"><X size={15} /></button>

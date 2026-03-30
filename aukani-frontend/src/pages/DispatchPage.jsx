@@ -8,6 +8,7 @@ import {
   Loader2, Users, ChevronDown, ChevronUp, X
 } from "lucide-react"
 import toast from "react-hot-toast"
+import { confirm } from "@/components/ui/ConfirmDialog"
 
 const STATUS = {
   PENDING:    { label: "Pendiente",   color: "var(--warning)", bg: "var(--warning-light)", icon: Clock },
@@ -262,7 +263,7 @@ export default function DispatchPage() {
               key={dispatch.id}
               dispatch={dispatch}
               onConfirm={(id) => confirm.mutate(id)}
-              onCancel={(id) => cancel.mutate(id)}
+              onCancel={async (id) => { const ok = await confirm({ title: "¿Cancelar pedido?", message: "El stock reservado se liberará.", confirmLabel: "Cancelar pedido", variant: "warning" }); if (ok) cancel.mutate(id) }}
               confirming={confirm.isPending && confirm.variables === dispatch.id}
               cancelling={cancel.isPending && cancel.variables === dispatch.id}
             />

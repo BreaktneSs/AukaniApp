@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "react-hot-toast"
 import MainLayout from "@/layouts/MainLayout"
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog"
 import ProtectedRoute from "@/components/ui/ProtectedRoute"
 import LoginPage from "@/pages/LoginPage"
 import POSPage from "@/pages/POSPage"
@@ -19,6 +20,7 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 3
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
+      <ConfirmProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -36,6 +38,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/pos" replace />} />
         </Routes>
       </BrowserRouter>
+      </ConfirmProvider>
       <Toaster position="top-right" toastOptions={{
         style: { background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)", fontSize: "13px" },
         duration: 3000,
