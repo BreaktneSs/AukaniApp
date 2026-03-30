@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dispatchService } from "@/services/dispatch.service"
 import { productsService } from "@/services/products.service"
-import { categoriesService } from "@/services/catalog.service"
+import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
 import { formatCOP, formatNumber } from "@/utils/currency"
 import {
@@ -10,6 +10,7 @@ import {
   Loader2, Package, CheckCircle, Clock, XCircle, ChevronRight
 } from "lucide-react"
 import toast from "react-hot-toast"
+import { confirm } from "@/components/ui/ConfirmDialog"
 
 // ── Placeholder SVG ───────────────────────────────────────
 function ImgPlaceholder({ small }) {
@@ -166,78 +167,98 @@ function CartItem({ item, onUpdate, onRemove }) {
   )
 }
 
-// ── Panel de pedido con efectivo recibido ─────────────────
+// ── Panel de pago multi-método ────────────────────────────
 function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
-  const [rawCash, setRawCash] = useState("")
-  const cashReceived = Number(rawCash) || 0
-  const displayCash = rawCash ? formatNumber(cashReceived) : ""
-  const change = cashReceived - total
+  const [payments, setPayments] = useState([])
+
+  const { data: paymentMethods = [] } = useQuery({
+    queryKey: ["payment-methods"],
+    queryFn: paymentMethodsService.getAll,
+  })
+
+  const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0)
+  const cashMethod = paymentMethods.find(m => m.name === "Efectivo")
+  const cashEntry = payments.find(p => p.paymentMethodId === cashMethod?.id)
+  const cashPaid = cashEntry?.amount || 0
+
+  // Calcular cuánto va en efectivo neto y cuál es el vuelto
+  const nonCashTotal = payments.filter(p => p.paymentMethodId !== cashMethod?.id).reduce((s, p) => s + (p.amount || 0), 0)
+  const cashNet = Math.max(0, total - nonCashTotal)
+  const change = cashPaid - cashNet
 
   const { mutate: send, isPending } = useMutation({
     mutationFn: () => dispatchService.createDispatch({
       subShiftId,
       items: items.map(i => ({ productId: i.id, quantity: i.quantity })),
-      cashReceived,
+      payments: payments.filter(p => (p.amount || 0) > 0).map(p => ({
+        paymentMethodId: p.paymentMethodId,
+        amount: p.amount,
+      })),
     }),
-    onSuccess: () => {
-      toast.success("✅ Pedido enviado al cajero")
-      onSent()
-    },
+    onSuccess: () => { toast.success("✅ Pedido enviado al cajero"); onSent() },
     onError: e => toast.error(e.response?.data?.error || "Error al enviar pedido"),
   })
 
+  const setAmount = (methodId, digits) => {
+    const amount = Number(digits) || 0
+    setPayments(prev => {
+      const exists = prev.find(p => p.paymentMethodId === methodId)
+      if (exists) return prev.map(p => p.paymentMethodId === methodId ? { ...p, amount, rawAmount: digits } : p)
+      return [...prev, { paymentMethodId: methodId, amount, rawAmount: digits }]
+    })
+  }
+
   return (
     <div className="space-y-3 animate-slide-up">
-      <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
-        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-          Dinero recibido del cliente
-        </p>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-bold"
-            style={{ color: "var(--text-muted)" }}>$</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoFocus
-            className="input pl-7 text-xl font-mono font-bold text-right pr-3"
-            placeholder="0"
-            value={displayCash}
-            onChange={e => {
-              const digits = e.target.value.replace(/\D/g, "")
-              setRawCash(digits)
-            }}
-          />
-        </div>
+      <div className="border-t pt-3 space-y-2.5" style={{ borderColor: "var(--border)" }}>
+        <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Pago del cliente</p>
+        {paymentMethods.filter(m => m.active).map(method => {
+          const p = payments.find(x => x.paymentMethodId === method.id)
+          const raw = p?.rawAmount || ""
+          const display = raw ? new Intl.NumberFormat("es-CO").format(Number(raw)) : ""
+          return (
+            <div key={method.id} className="flex items-center gap-2">
+              <label className="text-xs w-20 shrink-0 font-medium" style={{ color: "var(--text-secondary)" }}>{method.name}</label>
+              <div className="relative flex-1">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: "var(--text-muted)" }}>$</span>
+                <input type="text" inputMode="numeric" className="input text-sm font-mono font-bold pl-6 text-right"
+                  placeholder="0" value={display}
+                  onChange={e => setAmount(method.id, e.target.value.replace(/\D/g, ""))} />
+              </div>
+            </div>
+          )
+        })}
       </div>
 
-      {cashReceived > 0 && (
-        <div className="rounded-lg px-4 py-3 space-y-1.5"
-          style={{ background: change >= 0 ? "var(--brand-light)" : "var(--danger-light)" }}>
+      {totalPaid > 0 && (
+        <div className="rounded-lg px-4 py-3 space-y-1.5 animate-fade-in"
+          style={{ background: totalPaid >= total ? "var(--brand-light)" : "var(--danger-light)" }}>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--text-secondary)" }}>Total venta</span>
             <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(total)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span style={{ color: "var(--text-secondary)" }}>Recibido</span>
-            <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(cashReceived)}</span>
+            <span style={{ color: "var(--text-secondary)" }}>Total recibido</span>
+            <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(totalPaid)}</span>
           </div>
-          <div className="flex justify-between text-sm font-bold border-t pt-1.5" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
-            <span style={{ color: change >= 0 ? "var(--brand)" : "var(--danger)" }}>
-              {change >= 0 ? "Vuelto a dar" : "Falta dinero"}
-            </span>
-            <span className="font-mono" style={{ color: change >= 0 ? "var(--brand)" : "var(--danger)" }}>
-              {formatCOP(Math.abs(change))}
-            </span>
-          </div>
+          {change > 0 && (
+            <div className="flex justify-between text-sm font-bold border-t pt-1.5" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
+              <span style={{ color: "var(--brand)" }}>Vuelto en efectivo</span>
+              <span className="font-mono" style={{ color: "var(--brand)" }}>{formatCOP(change)}</span>
+            </div>
+          )}
+          {totalPaid < total && (
+            <div className="flex justify-between text-sm font-bold border-t pt-1.5" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
+              <span style={{ color: "var(--danger)" }}>Falta</span>
+              <span className="font-mono" style={{ color: "var(--danger)" }}>{formatCOP(total - totalPaid)}</span>
+            </div>
+          )}
         </div>
       )}
 
       <div className="flex gap-2">
         <button onClick={onCancel} className="btn-outline btn-md flex-1">Cancelar</button>
-        <button
-          onClick={() => send()}
-          disabled={isPending || cashReceived < total}
-          className="btn-primary btn-md flex-1">
+        <button onClick={() => send()} disabled={isPending || totalPaid < total} className="btn-primary btn-md flex-1">
           {isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           Enviar pedido
         </button>
@@ -349,7 +370,7 @@ export default function WaiterPage() {
           </p>
         </div>
         <button
-          onClick={() => { if (confirm("¿Cerrar tu turno de mesero?")) closeSub.mutate() }}
+          onClick={async () => { const ok = await confirm({ title: "¿Cerrar turno de mesero?", message: "Se cancelarán los pedidos pendientes.", confirmLabel: "Cerrar turno", cancelLabel: "Seguir trabajando" }); if (ok) closeSub.mutate() }}
           disabled={closeSub.isPending}
           className="btn-sm flex items-center gap-1.5"
           style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>

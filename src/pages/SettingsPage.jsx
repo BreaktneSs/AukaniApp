@@ -1,91 +1,14 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { shiftsService } from "@/services/shifts.service"
 import { usersService } from "@/services/users.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
-import { useCartStore } from "@/store/cart.store"
 import { Plus, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
+import { confirm } from "@/components/ui/ConfirmDialog"
 
-const TABS = ["Turno de caja", "Usuarios", "Categorías", "Métodos de pago"]
-
-// ── Turno ─────────────────────────────────────────────────
-function ShiftTab() {
-  const [openingCash, setOpeningCash] = useState("")
-  const [closingCash, setClosingCash] = useState("")
-  const [notes, setNotes] = useState("")
-  const { setShift } = useCartStore()
-  const qc = useQueryClient()
-
-  const { data: shift, isLoading } = useQuery({ queryKey: ["shift-mine"], queryFn: shiftsService.getMine, retry: false })
-
-  const open = useMutation({
-    mutationFn: () => shiftsService.open(Number(openingCash)),
-    onSuccess: (data) => { toast.success("Turno abierto"); setShift(data.id); qc.invalidateQueries({ queryKey: ["shift-mine"] }) },
-    onError: e => toast.error(e.response?.data?.error || "Error"),
-  })
-
-  const close = useMutation({
-    mutationFn: () => shiftsService.close(shift.id, { closingCash: Number(closingCash), notes }),
-    onSuccess: () => { toast.success("Turno cerrado"); setShift(null); qc.invalidateQueries({ queryKey: ["shift-mine"] }) },
-    onError: e => toast.error(e.response?.data?.error || "Error"),
-  })
-
-  if (isLoading) return <div className="flex justify-center py-10"><Loader2 className="animate-spin" style={{ color: "var(--text-muted)" }} /></div>
-
-  return (
-    <div className="max-w-sm space-y-4">
-      {shift ? (
-        <div className="space-y-4">
-          <div className="card p-4 space-y-2">
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle size={16} style={{ color: "var(--brand)" }} />
-              <span className="font-semibold text-sm" style={{ color: "var(--brand)" }}>Turno activo</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span style={{ color: "var(--text-muted)" }}>Apertura</span>
-              <span className="font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(shift.openingCash)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span style={{ color: "var(--text-muted)" }}>Inicio</span>
-              <span style={{ color: "var(--text-secondary)" }}>{new Date(shift.openedAt).toLocaleTimeString()}</span>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Efectivo en caja al cerrar</label>
-            <input type="number" className="input" placeholder="0.00" value={closingCash} onChange={e => setClosingCash(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Notas</label>
-            <textarea className="input resize-none" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
-          <button onClick={() => close.mutate()} disabled={!closingCash || close.isPending}
-            className="btn-md w-full text-white" style={{ background: "var(--danger)" }}>
-            {close.isPending ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-            Cerrar turno
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="card p-4 text-center space-y-2">
-            <XCircle size={24} className="mx-auto" style={{ color: "var(--text-muted)" }} />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>No hay turno activo</p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Efectivo inicial en caja</label>
-            <input type="number" className="input" placeholder="0.00" value={openingCash} onChange={e => setOpeningCash(e.target.value)} />
-          </div>
-          <button onClick={() => open.mutate()} disabled={!openingCash || open.isPending} className="btn-primary btn-md w-full">
-            {open.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-            Abrir turno
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
+const TABS = ["Usuarios", "Categorías", "Métodos de pago"]
 
 // ── Usuarios ─────────────────────────────────────────────
 function UsersTab() {
@@ -122,7 +45,7 @@ function UsersTab() {
               </div>
               <span className="badge text-xs" style={{ color: ROLES[u.role]?.color, background: `${ROLES[u.role]?.color}22` }}>{ROLES[u.role]?.label}</span>
               {u.active && (
-                <button onClick={() => { if (confirm(`¿Desactivar a ${u.name}?`)) deactivate.mutate(u.id) }}
+                <button onClick={() => { confirm({ title: `¿Desactivar a ${u.name}?`, message: "El usuario no podrá iniciar sesión.", confirmLabel: "Desactivar" }).then(ok => { if (ok) deactivate.mutate(u.id) }) }}
                   className="btn-ghost w-7 h-7 rounded flex items-center justify-center text-xs"
                   style={{ color: "var(--danger)" }}>✕</button>
               )}
@@ -195,7 +118,7 @@ function SimpleListTab({ queryKey, fetchFn, createFn, deleteFn, label, minItems 
       toast.error(`Debe haber al menos ${minItems} ${label.toLowerCase()}`)
       return
     }
-    if (confirm(`¿Eliminar "${item.name}"?`)) remove.mutate(item.id)
+    confirm({ title: `¿Eliminar "${item.name}"?`, message: "Esta acción no se puede deshacer.", confirmLabel: "Eliminar" }).then(ok => { if (ok) remove.mutate(item.id) })
   }
 
   const handleKeyDown = (e) => {
@@ -295,10 +218,9 @@ export default function SettingsPage() {
       </div>
 
       <div className="animate-fade-in">
-        {tab === 0 && <ShiftTab />}
-        {tab === 1 && isAdmin && <UsersTab />}
-        {tab === (isAdmin ? 2 : 1) && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
-        {tab === (isAdmin ? 3 : 2) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
+        {tab === 0 && isAdmin && <UsersTab />}
+        {tab === (isAdmin ? 1 : 0) && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
+        {tab === (isAdmin ? 2 : 1) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
       </div>
     </div>
   )

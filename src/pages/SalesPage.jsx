@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ordersService } from "@/services/orders.service"
 import { ClipboardList, Eye, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { confirm } from "@/components/ui/ConfirmDialog"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 
@@ -125,7 +126,7 @@ export default function SalesPage() {
                           <Eye size={13} />
                         </button>
                         {o.status === "COMPLETED" && (
-                          <button onClick={() => { if (confirm("¿Cancelar esta venta?")) cancel.mutate(o.id) }}
+                          <button onClick={() => { confirm({ title: "¿Cancelar esta venta?", message: "Se restaurará el stock de los productos.", confirmLabel: "Cancelar venta", variant: "warning" }).then(ok => { if (ok) cancel.mutate(o.id) }) }}
                             className="w-7 h-7 rounded flex items-center justify-center btn-ghost"
                             style={{ color: "var(--danger)" }}>
                             <XCircle size={13} />
