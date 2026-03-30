@@ -56,7 +56,7 @@ export const dispatchService = {
 
   // ── Pedidos de despacho ───────────────────────────────────
 
-  async createDispatch({ subShiftId, items, cashReceived }) {
+  async createDispatch({ subShiftId, items, payments }) {
     const subShift = await prisma.subShift.findUnique({
       where: { id: subShiftId },
       include: { parentShift: true },
@@ -65,7 +65,6 @@ export const dispatchService = {
       throw { statusCode: 400, message: "No tienes un turno de mesero abierto" }
     }
 
-    // Calcular total y validar stock
     return prisma.$transaction(async (tx) => {
       let total = 0
       const dispatchItems = []
@@ -78,26 +77,47 @@ export const dispatchService = {
         total += Number(product.price) * item.quantity
         dispatchItems.push({ productId: product.id, quantity: item.quantity, price: product.price })
 
-        // Reservar stock inmediatamente
         await tx.product.update({
           where: { id: product.id },
           data: { stock: { decrement: item.quantity } },
         })
       }
 
-      const change = Number(cashReceived) - total
-      if (change < 0) throw { statusCode: 400, message: `Dinero insuficiente. Total: $${total}, Recibido: $${cashReceived}` }
+      // Calcular total recibido y vuelto (solo aplica sobre efectivo)
+      const totalReceived = payments.reduce((s, p) => s + Number(p.amount), 0)
+      if (totalReceived < total) throw { statusCode: 400, message: `Pago insuficiente. Total: $${total}, Recibido: $${totalReceived}` }
+
+      // Vuelto solo en efectivo — la diferencia entre lo recibido en efectivo y lo que corresponde
+      const cashMethod = await tx.paymentMethod.findFirst({ where: { name: "Efectivo", active: true } })
+      const cashPayment = payments.find(p => p.paymentMethodId === cashMethod?.id)
+      const cashAmount = Number(cashPayment?.amount || 0)
+
+      // Distribuir pagos netos (sin sobrepago)
+      const netPayments = payments.map((p, idx, arr) => {
+        if (arr.length === 1) return { paymentMethodId: p.paymentMethodId, amount: total }
+        if (idx === arr.length - 1) {
+          const prev = arr.slice(0, idx).reduce((s, x) => s + Number(x.amount), 0)
+          return { paymentMethodId: p.paymentMethodId, amount: Math.max(0, total - prev) }
+        }
+        return { paymentMethodId: p.paymentMethodId, amount: Number(p.amount) }
+      }).filter(p => p.amount > 0)
+
+      // Vuelto = lo que el cliente dio de más en efectivo
+      const netCash = netPayments.find(p => p.paymentMethodId === cashMethod?.id)?.amount || 0
+      const change = cashAmount - netCash
 
       const dispatch = await tx.dispatchOrder.create({
         data: {
           subShiftId,
           total,
-          cashReceived,
-          change,
+          cashReceived: totalReceived,
+          change: Math.max(0, change),
           items: { create: dispatchItems },
+          payments: { create: netPayments },
         },
         include: {
           items: { include: { product: { select: { id: true, name: true, imageUrl: true } } } },
+          payments: { include: { paymentMethod: true } },
           subShift: { include: { user: { select: { id: true, name: true } } } },
         },
       })
@@ -111,6 +131,7 @@ export const dispatchService = {
       where: { id: dispatchId },
       include: {
         items: true,
+        payments: { include: { paymentMethod: true } },
         subShift: { include: { parentShift: true } },
       },
     })
@@ -124,7 +145,7 @@ export const dispatchService = {
     }
 
     return prisma.$transaction(async (tx) => {
-      // Crear la orden real en la caja principal
+      // Crear la orden real en la caja principal con los métodos de pago del despacho
       const parentShiftId = dispatch.subShift.parentShiftId
 
       const order = await tx.order.create({
@@ -140,10 +161,10 @@ export const dispatchService = {
             })),
           },
           payments: {
-            create: [{
-              paymentMethodId: (await tx.paymentMethod.findFirst({ where: { name: "Efectivo", active: true } }))?.id || 1,
-              amount: dispatch.total,
-            }],
+            create: dispatch.payments.map(p => ({
+              paymentMethodId: p.paymentMethodId,
+              amount: p.amount,
+            })),
           },
         },
       })

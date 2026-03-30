@@ -32,8 +32,8 @@ export const dispatchController = {
 
   // Pedidos
   async createDispatch(req, reply) {
-    const { subShiftId, items, cashReceived } = req.body
-    const dispatch = await dispatchService.createDispatch({ subShiftId, items, cashReceived })
+    const { subShiftId, items, payments } = req.body
+    const dispatch = await dispatchService.createDispatch({ subShiftId, items, payments })
     return reply.status(201).send(dispatch)
   },
 
