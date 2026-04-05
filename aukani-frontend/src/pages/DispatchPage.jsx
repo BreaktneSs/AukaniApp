@@ -169,7 +169,7 @@ export default function DispatchPage() {
     prevCountRef.current = pending.length
   }, [pending.length])
 
-  const confirm = useMutation({
+  const confirmDispatch = useMutation({
     mutationFn: dispatchService.confirmDispatch,
     onSuccess: () => {
       toast.success("✅ Pedido despachado")
@@ -262,9 +262,9 @@ export default function DispatchPage() {
             <DispatchCard
               key={dispatch.id}
               dispatch={dispatch}
-              onConfirm={(id) => confirm.mutate(id)}
+              onConfirm={(id) => confirmDispatch.mutate(id)}
               onCancel={async (id) => { const ok = await confirm({ title: "¿Cancelar pedido?", message: "El stock reservado se liberará.", confirmLabel: "Cancelar pedido", variant: "warning" }); if (ok) cancel.mutate(id) }}
-              confirming={confirm.isPending && confirm.variables === dispatch.id}
+              confirming={confirmDispatch.isPending && confirmDispatch.variables === dispatch.id}
               cancelling={cancel.isPending && cancel.variables === dispatch.id}
             />
           ))}
