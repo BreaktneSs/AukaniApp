@@ -23,31 +23,32 @@ function ProductCard({ product, onAdd }) {
   const [err, setErr] = useState(false)
   return (
     <button onClick={() => onAdd(product)}
-      className="card text-left transition-all duration-150 animate-fade-in active:scale-95 w-full group overflow-hidden flex flex-col"
-      style={{ borderColor: "var(--border)", minHeight: "160px" }}>
-      {/* Imagen ocupa la mitad superior */}
-      <div className="w-full flex-1 relative" style={{ minHeight: "100px" }}>
-        {product.imageUrl && !err
-          ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name} className="w-full h-full object-cover absolute inset-0" />
-          : <div className="w-full h-full flex items-center justify-center absolute inset-0" style={{ background: "var(--bg-tertiary)" }}>
-              <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10">
-                <rect x="4" y="10" width="40" height="28" rx="3" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
-                <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
-                <path d="M4 32 L14 22 L22 30 L30 22 L44 36" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: "var(--border)" }} />
-              </svg>
-            </div>
-        }
-      </div>
-      {/* Info en la parte inferior */}
-      <div className="p-2.5 shrink-0">
-        <p className="text-sm font-semibold leading-tight line-clamp-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--text-primary)" }}>
+      className="relative aspect-square w-full overflow-hidden rounded-xl transition-all duration-150 animate-fade-in active:scale-95 group"
+      style={{ border: "1px solid var(--border)" }}>
+      {/* Imagen llena todo el cuadro */}
+      {product.imageUrl && !err
+        ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name}
+            className="w-full h-full object-contain"
+            style={{ background: "var(--bg-tertiary)" }} />
+        : <div className="w-full h-full flex items-center justify-center" style={{ background: "var(--bg-tertiary)" }}>
+            <svg viewBox="0 0 48 48" fill="none" className="w-8 h-8">
+              <rect x="4" y="10" width="40" height="28" rx="3" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+              <circle cx="16" cy="20" r="4" stroke="currentColor" strokeWidth="2" fill="none" style={{ color: "var(--border)" }} />
+              <path d="M4 32 L14 22 L22 30 L30 22 L44 36" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" style={{ color: "var(--border)" }} />
+            </svg>
+          </div>
+      }
+      {/* Info superpuesta en la parte inferior */}
+      <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1"
+        style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}>
+        <p className="text-xs font-semibold leading-tight line-clamp-1 text-white">
           {product.name}
         </p>
-        <div className="flex items-center justify-between mt-1.5">
-          <p className="font-mono font-bold text-base" style={{ color: "var(--brand)" }}>
+        <div className="flex items-center justify-between mt-0.5">
+          <p className="font-mono font-bold text-xs text-white">
             {formatCOP(product.price)}
           </p>
-          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
+          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "rgba(255,255,255,0.55)" }}>
             {product.stock} uds
           </p>
         </div>
@@ -553,7 +554,7 @@ export default function POSPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                 {displayProducts.map(p => <ProductCard key={p.id} product={p} onAdd={handleAddToCart} />)}
               </div>
             )}
