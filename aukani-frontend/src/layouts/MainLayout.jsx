@@ -3,9 +3,9 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/auth.store"
 import { useThemeStore } from "@/store/theme.store"
 import {
-  ShoppingCart, Package, BarChart3, ClipboardList, Settings,
+  ShoppingCart, BarChart3, ClipboardList, Settings,
   LogOut, Sun, Moon, Boxes, Menu,
-  Landmark, Smartphone, Bell
+  Landmark, Smartphone, Bell, ShieldCheck
 } from "lucide-react"
 
 const nav = [
@@ -17,6 +17,7 @@ const nav = [
   { to: "/shifts",    icon: Landmark,        label: "Control caja",  roles: ["ADMIN","JEFE"] },
   { to: "/dashboard", icon: BarChart3,       label: "Dashboard",     roles: ["ADMIN","JEFE"] },
   { to: "/settings",  icon: Settings,        label: "Config.",       roles: ["ADMIN"] },
+  { to: "/audit",     icon: ShieldCheck,     label: "Auditoría",     roles: ["ADMIN"] },
 ]
 
 export default function MainLayout() {

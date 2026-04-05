@@ -1,13 +1,30 @@
 import { shiftService } from "../services/shift.service.js"
+import { auditService } from "../services/audit.service.js"
+
+const ip = (req) => req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip
 
 export const shiftController = {
   async open(req, reply) {
     const shift = await shiftService.openShift(req.user.id, req.body.openingCash)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "SHIFT_OPEN", entity: "SHIFT", entityId: shift.id,
+      entityLabel: `Turno #${shift.id}`,
+      newValues: { openingCash: shift.openingCash },
+      ip: ip(req),
+    })
     return reply.status(201).send(shift)
   },
 
   async close(req, reply) {
     const shift = await shiftService.closeShift(Number(req.params.id), req.user.id, req.body)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "SHIFT_CLOSE", entity: "SHIFT", entityId: shift.id,
+      entityLabel: `Turno #${shift.id}`,
+      newValues: { closingCash: shift.closingCash, difference: shift.difference },
+      ip: ip(req),
+    })
     return reply.send(shift)
   },
 

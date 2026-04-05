@@ -1,4 +1,7 @@
 import { productService } from "../services/product.service.js"
+import { auditService } from "../services/audit.service.js"
+
+const ip = (req) => req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip
 
 export const productController = {
   async getAll(req, reply) {
@@ -28,7 +31,6 @@ export const productController = {
     return reply.send(product)
   },
 
-  // /products/search?q= ahora también devuelve { products, total }
   async search(req, reply) {
     const { q } = req.query
     const result = await productService.getAll({ search: q || "", limit: 50 })
@@ -37,11 +39,27 @@ export const productController = {
 
   async create(req, reply) {
     const product = await productService.create(req.body)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "PRODUCT_CREATE", entity: "PRODUCT", entityId: product.id,
+      entityLabel: product.name,
+      newValues: { name: product.name, price: product.price, stock: product.stock },
+      ip: ip(req),
+    })
     return reply.status(201).send(product)
   },
 
   async update(req, reply) {
+    const before = await productService.getById(Number(req.params.id))
     const product = await productService.update(Number(req.params.id), req.body)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "PRODUCT_UPDATE", entity: "PRODUCT", entityId: product.id,
+      entityLabel: product.name,
+      oldValues: { name: before.name, price: before.price, stock: before.stock, active: before.active },
+      newValues: { name: product.name, price: product.price, stock: product.stock, active: product.active },
+      ip: ip(req),
+    })
     return reply.send(product)
   },
 
@@ -52,7 +70,15 @@ export const productController = {
   },
 
   async delete(req, reply) {
+    const before = await productService.getById(Number(req.params.id))
     await productService.delete(Number(req.params.id))
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "PRODUCT_DELETE", entity: "PRODUCT", entityId: before?.id,
+      entityLabel: before?.name,
+      oldValues: { name: before?.name, price: before?.price },
+      ip: ip(req),
+    })
     return reply.status(204).send()
   },
 }

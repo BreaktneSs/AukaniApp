@@ -1,8 +1,10 @@
 import { dispatchService } from "../services/dispatch.service.js"
+import { auditService } from "../services/audit.service.js"
+
+const ip = (req) => req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip
 
 export const dispatchController = {
 
-  // Sub-turnos
   async getMySubShift(req, reply) {
     const sub = await dispatchService.getOpenSubShift(req.user.id)
     if (!sub) return reply.status(404).send({ error: "No tienes un turno de mesero abierto" })
@@ -12,11 +14,24 @@ export const dispatchController = {
   async openSubShift(req, reply) {
     const { parentShiftId } = req.body
     const sub = await dispatchService.openSubShift(req.user.id, parentShiftId)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "SUBSHIFT_OPEN", entity: "SUBSHIFT", entityId: sub.id,
+      entityLabel: `Caja remota #${sub.id}`,
+      newValues: { parentShiftId },
+      ip: ip(req),
+    })
     return reply.status(201).send(sub)
   },
 
   async closeSubShift(req, reply) {
     const sub = await dispatchService.closeSubShift(Number(req.params.id), req.user.id)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "SUBSHIFT_CLOSE", entity: "SUBSHIFT", entityId: sub.id,
+      entityLabel: `Caja remota #${sub.id}`,
+      ip: ip(req),
+    })
     return reply.send(sub)
   },
 
@@ -30,10 +45,16 @@ export const dispatchController = {
     return reply.send(subs)
   },
 
-  // Pedidos
   async createDispatch(req, reply) {
     const { subShiftId, items, payments } = req.body
     const dispatch = await dispatchService.createDispatch({ subShiftId, items, payments })
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "DISPATCH_CREATE", entity: "DISPATCH", entityId: dispatch.id,
+      entityLabel: `Despacho #${dispatch.id}`,
+      newValues: { total: dispatch.total, subShiftId, itemCount: items.length },
+      ip: ip(req),
+    })
     return reply.status(201).send(dispatch)
   },
 
@@ -51,11 +72,25 @@ export const dispatchController = {
 
   async confirmDispatch(req, reply) {
     const result = await dispatchService.confirmDispatch(Number(req.params.id), req.user.id)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "DISPATCH_CONFIRM", entity: "DISPATCH", entityId: result.dispatch?.id,
+      entityLabel: `Despacho #${result.dispatch?.id}`,
+      newValues: { status: "DISPATCHED", orderId: result.order?.id },
+      ip: ip(req),
+    })
     return reply.send(result)
   },
 
   async cancelDispatch(req, reply) {
     const result = await dispatchService.cancelDispatch(Number(req.params.id), req.user.id)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "DISPATCH_CANCEL", entity: "DISPATCH", entityId: result.id,
+      entityLabel: `Despacho #${result.id}`,
+      newValues: { status: "CANCELLED" },
+      ip: ip(req),
+    })
     return reply.send(result)
   },
 }
