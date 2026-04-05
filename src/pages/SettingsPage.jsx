@@ -6,9 +6,10 @@ import { useAuthStore } from "@/store/auth.store"
 import { Plus, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
+import { agentService } from "@/services/agent.service"
 import { confirm } from "@/components/ui/ConfirmDialog"
 
-const TABS = ["Usuarios", "Categorías", "Métodos de pago"]
+const TABS = ["Negocio", "Impresora", "Usuarios", "Categorías", "Métodos de pago"]
 
 // ── Usuarios ─────────────────────────────────────────────
 function UsersTab() {
@@ -195,6 +196,202 @@ function SimpleListTab({ queryKey, fetchFn, createFn, deleteFn, label, minItems 
   )
 }
 
+// ── Configuración de impresora / agente ──────────────────
+function PrinterTab() {
+  const [status, setStatus] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const [printers, setPrinters] = useState([])
+  const [selectedPrinter, setSelectedPrinter] = useState("")
+  const [useAgent, setUseAgent] = useState(true)
+
+  // Cargar config guardada
+  useState(() => {
+    const cfg = JSON.parse(localStorage.getItem("aukani_agent") || "{}")
+    setUseAgent(cfg.useAgent !== false)
+    setSelectedPrinter(cfg.printer || "")
+  })
+
+  const checkAgent = async () => {
+    setChecking(true)
+    const result = await agentService.status()
+    setStatus(result)
+    if (result.ok) {
+      const p = await agentService.printers()
+      setPrinters(p.printers || [])
+      toast.success("✅ Agente conectado")
+    } else {
+      toast.error("Agente no disponible — ¿está corriendo?")
+    }
+    setChecking(false)
+  }
+
+  const testDrawer = async () => {
+    const result = await agentService.openDrawer()
+    if (result.ok) toast.success("✅ Cajón abierto correctamente")
+    else toast.error(`Error: ${result.error}`)
+  }
+
+  const saveAgentConfig = (cfg) => {
+    localStorage.setItem("aukani_agent", JSON.stringify(cfg))
+    toast.success("Configuración guardada")
+  }
+
+  const platform = navigator.platform.toLowerCase().includes("win") ? "windows" :
+                   navigator.platform.toLowerCase().includes("mac") ? "mac" : "linux"
+
+  const downloadName = platform === "windows" ? "aukani-agent-windows.exe" :
+                       platform === "mac" ? "aukani-agent-mac" : "aukani-agent-linux"
+
+  return (
+    <div className="max-w-sm space-y-5">
+
+      {/* Estado del agente */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Aukani Agent</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Controla impresora y cajón de efectivo</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ background: status?.ok ? "var(--brand)" : "var(--text-muted)" }} />
+            <span className="text-xs font-medium" style={{ color: status?.ok ? "var(--brand)" : "var(--text-muted)" }}>
+              {status === null ? "Sin verificar" : status?.ok ? `v${status.version}` : "No disponible"}
+            </span>
+          </div>
+        </div>
+
+        {status?.ok && (
+          <div className="space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
+            <p>Sistema: {status.platform}</p>
+            <p>Puerto detectado: {status.detectedPort || "No detectado"}</p>
+            {status.configuredPort && <p>Puerto configurado: {status.configuredPort}</p>}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={checkAgent} disabled={checking} className="btn-outline btn-sm flex-1">
+            {checking ? <Loader2 size={13} className="animate-spin" /> : null}
+            {checking ? "Verificando..." : "Verificar conexión"}
+          </button>
+          {status?.ok && (
+            <button onClick={testDrawer} className="btn-sm flex-1"
+              style={{ background: "var(--brand-light)", color: "var(--brand)", border: "1px solid var(--brand)" }}>
+              Probar cajón
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Impresora */}
+      {status?.ok && printers.length > 0 && (
+        <div className="space-y-2">
+          <label className="block text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Impresora del sistema</label>
+          <select className="input" value={selectedPrinter}
+            onChange={e => {
+              setSelectedPrinter(e.target.value)
+              saveAgentConfig({ useAgent: true, printer: e.target.value })
+            }}>
+            <option value="">Impresora predeterminada</option>
+            {printers.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Toggle usar agente */}
+      <label className="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" checked={useAgent}
+          onChange={e => {
+            setUseAgent(e.target.checked)
+            saveAgentConfig({ useAgent: e.target.checked, printer: selectedPrinter })
+          }}
+          className="w-4 h-4 rounded" />
+        <div>
+          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Usar agente local</p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Si está desactivado, se abrirá una ventana del navegador para imprimir
+          </p>
+        </div>
+      </label>
+
+      {/* Descarga del agente */}
+      <div className="card p-4 space-y-3" style={{ background: "var(--bg-primary)" }}>
+        <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+          ¿No tienes el agente instalado?
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Descarga e instala el agente en el computador donde está conectada la impresora.
+          Deja el programa abierto mientras usas Aukani POS.
+        </p>
+        <div className="flex flex-col gap-2">
+          <a href="/downloads/aukani-agent-windows.exe" download
+            className="btn-outline btn-sm text-center">
+            ⬇ Descargar para Windows (.exe)
+          </a>
+          <a href="/downloads/aukani-agent-linux" download
+            className="btn-outline btn-sm text-center">
+            ⬇ Descargar para Linux
+          </a>
+        </div>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Versión 1.0.0 · Compatible con impresoras ESC/POS de 80mm
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Configuración del negocio ─────────────────────────────
+function BusinessTab() {
+  const STORAGE_KEY = "aukani_business"
+  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
+  const [form, setForm] = useState({
+    name:    stored.name    || "Aukani POS",
+    nit:     stored.nit     || "",
+    address: stored.address || "",
+    phone:   stored.phone   || "",
+    footer:  stored.footer  || "¡Gracias por su compra!",
+  })
+  const [saved, setSaved] = useState(false)
+
+  const handleSave = (e) => {
+    e.preventDefault()
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const field = (label, key, placeholder, multiline = false) => (
+    <div>
+      <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{label}</label>
+      {multiline
+        ? <textarea className="input resize-none" rows={2} value={form[key]} placeholder={placeholder}
+            onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
+        : <input type="text" className="input" value={form[key]} placeholder={placeholder}
+            onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
+      }
+    </div>
+  )
+
+  return (
+    <div className="max-w-sm space-y-4">
+      <div className="card p-4 space-y-1" style={{ background: "var(--brand-light)", borderColor: "var(--brand)" }}>
+        <p className="text-xs font-semibold" style={{ color: "var(--brand)" }}>Datos de la factura</p>
+        <p className="text-xs" style={{ color: "var(--brand)" }}>Esta información aparecerá en el encabezado de cada recibo impreso.</p>
+      </div>
+      <form onSubmit={handleSave} className="space-y-3">
+        {field("Nombre del negocio *", "name", "Mi Tienda")}
+        {field("NIT / RUT", "nit", "123456789-0")}
+        {field("Dirección", "address", "Calle 123 #45-67")}
+        {field("Teléfono", "phone", "300 123 4567")}
+        {field("Mensaje de pie de página", "footer", "¡Gracias por su compra!", true)}
+        <button type="submit" className="btn-primary btn-md w-full">
+          {saved ? "✅ Guardado" : "Guardar configuración"}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────
 export default function SettingsPage() {
   const [tab, setTab] = useState(0)
@@ -218,9 +415,11 @@ export default function SettingsPage() {
       </div>
 
       <div className="animate-fade-in">
-        {tab === 0 && isAdmin && <UsersTab />}
-        {tab === (isAdmin ? 1 : 0) && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
-        {tab === (isAdmin ? 2 : 1) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
+        {tab === 0 && <BusinessTab />}
+        {tab === 1 && <PrinterTab />}
+        {tab === 2 && isAdmin && <UsersTab />}
+        {tab === (isAdmin ? 3 : 2) && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
+        {tab === (isAdmin ? 4 : 3) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
       </div>
     </div>
   )
