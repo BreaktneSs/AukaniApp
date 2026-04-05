@@ -1,6 +1,7 @@
 import "dotenv/config"
 import Fastify from "fastify"
 import cors from "@fastify/cors"
+import rateLimit from "@fastify/rate-limit"
 import multipart from "@fastify/multipart"
 import staticFiles from "@fastify/static"
 import path from "path"
@@ -14,6 +15,7 @@ import { shiftRoutes }     from "./routes/shift.routes.js"
 import { inventoryRoutes } from "./routes/inventory.routes.js"
 import { catalogRoutes }   from "./routes/catalog.routes.js"
 import { dispatchRoutes }  from "./routes/dispatch.routes.js"
+import { auditRoutes }     from "./routes/audit.routes.js"
 import { errorHandler }    from "./middlewares/errorHandler.js"
 import prisma              from "./config/prisma.js"
 
@@ -23,6 +25,9 @@ const app = Fastify({ logger: true })
 
 // ── Plugins ──────────────────────────────────────────────
 await app.register(cors, { origin: true })
+await app.register(rateLimit, {
+  global: false, // solo aplicar donde se indique explícitamente
+})
 await app.register(multipart)
 await app.register(staticFiles, {
   root: path.join(__dirname, "..", "uploads"),
@@ -45,6 +50,7 @@ await app.register(shiftRoutes)
 await app.register(inventoryRoutes)
 await app.register(catalogRoutes)
 await app.register(dispatchRoutes)
+await app.register(auditRoutes)
 
 // ── Error handler ────────────────────────────────────────
 app.setErrorHandler(errorHandler)

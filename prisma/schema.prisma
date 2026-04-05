@@ -279,3 +279,58 @@ model DispatchItem {
 
   @@index([dispatchOrderId])
 }
+
+// ─── AUDITORÍA ───────────────────────────────────────────
+
+enum AuditAction {
+  LOGIN
+  USER_CREATE
+  USER_UPDATE
+  USER_DEACTIVATE
+  USER_PASSWORD_CHANGE
+  PRODUCT_CREATE
+  PRODUCT_UPDATE
+  PRODUCT_DELETE
+  SALE_CREATE
+  SALE_CANCEL
+  SHIFT_OPEN
+  SHIFT_CLOSE
+  SUBSHIFT_OPEN
+  SUBSHIFT_CLOSE
+  DISPATCH_CREATE
+  DISPATCH_CONFIRM
+  DISPATCH_CANCEL
+  INVENTORY_ENTRY
+  INVENTORY_EXIT
+}
+
+enum AuditEntity {
+  AUTH
+  USER
+  PRODUCT
+  ORDER
+  SHIFT
+  SUBSHIFT
+  DISPATCH
+  INVENTORY
+}
+
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  userId      Int?
+  userName    String
+  userRole    String
+  action      AuditAction
+  entity      AuditEntity
+  entityId    Int?
+  entityLabel String?
+  oldValues   Json?
+  newValues   Json?
+  ip          String?
+  createdAt   DateTime    @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+}
