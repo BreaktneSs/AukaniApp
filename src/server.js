@@ -29,6 +29,13 @@ await app.register(staticFiles, {
   prefix: "/uploads/",
 })
 
+// Servir binarios del agente para descarga
+await app.register(staticFiles, {
+  root: path.join(__dirname, "..", "downloads"),
+  prefix: "/downloads/",
+  decorateReply: false,
+})
+
 // ── Routes ───────────────────────────────────────────────
 await app.register(authRoutes)
 await app.register(userRoutes)
