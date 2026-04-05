@@ -6,6 +6,6 @@ export async function inventoryRoutes(fastify) {
   fastify.post("/inventory/entry",    { preHandler: allRoles },    inventoryController.entry)
   // Salida manual: solo admin y jefe
   fastify.post("/inventory/exit",     { preHandler: adminOrJefe }, inventoryController.exit)
-  fastify.get("/inventory/movements", { preHandler: adminOrJefe }, inventoryController.getMovements)
+  fastify.get("/inventory/movements", { preHandler: allRoles },    inventoryController.getMovements)
   fastify.get("/inventory/low-stock", { preHandler: adminOrJefe }, inventoryController.getLowStock)
 }

@@ -4,6 +4,7 @@ import prisma from "../config/prisma.js"
 export const userService = {
   async getAll() {
     return prisma.user.findMany({
+      where: { active: true },
       select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
       orderBy: { name: "asc" },
     })
