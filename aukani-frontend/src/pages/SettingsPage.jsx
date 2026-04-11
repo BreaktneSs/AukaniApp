@@ -323,11 +323,11 @@ function PrinterTab() {
           Deja el programa abierto mientras usas Aukani POS.
         </p>
         <div className="flex flex-col gap-2">
-          <a href="/downloads/aukani-agent-windows.exe" download
+          <a href="/api/downloads/aukani-agent-windows.exe" download="aukani-agent-windows.exe"
             className="btn-outline btn-sm text-center">
             ⬇ Descargar para Windows (.exe)
           </a>
-          <a href="/downloads/aukani-agent-linux" download
+          <a href="/api/downloads/aukani-agent-linux" download="aukani-agent-linux"
             className="btn-outline btn-sm text-center">
             ⬇ Descargar para Linux
           </a>
