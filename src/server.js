@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit"
 import multipart from "@fastify/multipart"
 import staticFiles from "@fastify/static"
 import path from "path"
+import fs from "fs"
 import { fileURLToPath } from "url"
 
 import { authRoutes }      from "./routes/auth.routes.js"
@@ -34,11 +35,20 @@ await app.register(staticFiles, {
   prefix: "/uploads/",
 })
 
-// Servir binarios del agente para descarga
-await app.register(staticFiles, {
-  root: path.join(__dirname, "..", "downloads"),
-  prefix: "/downloads/",
-  decorateReply: false,
+// En server.js — reemplaza el registro de downloads por esto:
+app.get("/downloads/:filename", async (req, reply) => {
+  const filename = req.params.filename
+  const filePath = path.join(__dirname, "..", "downloads", filename)
+  
+  try {
+    const stream = fs.createReadStream(filePath)
+    reply
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .header("Content-Type", "application/octet-stream")
+      .send(stream)
+  } catch {
+    reply.status(404).send({ error: "Archivo no encontrado" })
+  }
 })
 
 // ── Routes ───────────────────────────────────────────────
