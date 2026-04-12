@@ -5,6 +5,7 @@ export async function orderRoutes(fastify) {
   fastify.post("/sale",                    { preHandler: allRoles },    orderController.createSale)
   fastify.patch("/orders/:id/cancel",      { preHandler: adminOrJefe }, orderController.cancel)
   fastify.get("/orders",                   { preHandler: adminOrJefe }, orderController.getAll)
-  fastify.get("/orders/summary/daily",     { preHandler: adminOrJefe }, orderController.getDailySummary)
+  fastify.get("/orders/summary/daily",      { preHandler: adminOrJefe }, orderController.getDailySummary)
+  fastify.get("/orders/accounting",         { preHandler: adminOrJefe }, orderController.getAccountingReport)
   fastify.get("/orders/:id",               { preHandler: adminOrJefe }, orderController.getById)
 }

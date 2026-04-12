@@ -115,4 +115,101 @@ export const orderService = {
     const [count, aggregate] = await Promise.all([prisma.order.count({ where }), prisma.order.aggregate({ where, _sum: { total: true } })])
     return { date: today.toISOString().split("T")[0], totalOrders: count, totalRevenue: Number(aggregate._sum.total ?? 0) }
   },
+
+  async getAccountingReport({ from, to }) {
+    // Parsear fechas — siempre cubrir el día completo
+    const dateFrom = from
+      ? (() => { const d = new Date(from + "T00:00:00.000Z"); return d })()
+      : (() => { const d = new Date(); d.setUTCDate(d.getUTCDate() - 6); d.setUTCHours(0,0,0,0); return d })()
+
+    const dateTo = to
+      ? (() => { const d = new Date(to + "T23:59:59.999Z"); return d })()
+      : (() => { const d = new Date(); d.setUTCHours(23,59,59,999); return d })()
+
+    // Totales generales
+    const [completedAgg, completedCount, cancelledCount] = await Promise.all([
+      prisma.order.aggregate({ where: { createdAt: { gte: dateFrom, lte: dateTo }, status: "COMPLETED" }, _sum: { total: true } }),
+      prisma.order.count({ where: { createdAt: { gte: dateFrom, lte: dateTo }, status: "COMPLETED" } }),
+      prisma.order.count({ where: { createdAt: { gte: dateFrom, lte: dateTo }, status: "CANCELLED" } }),
+    ])
+
+    const totalRevenue = Number(completedAgg._sum.total ?? 0)
+    const avgTicket    = completedCount > 0 ? totalRevenue / completedCount : 0
+
+    // IDs de órdenes completadas — necesario para sub-queries (Prisma no permite filtrar por relación en groupBy)
+    const completedOrders = await prisma.order.findMany({
+      where: { createdAt: { gte: dateFrom, lte: dateTo }, status: "COMPLETED" },
+      select: { id: true },
+    })
+    const orderIds = completedOrders.map(o => o.id)
+
+    // Desglose por método de pago
+    let paymentBreakdown = []
+    if (orderIds.length > 0) {
+      const paymentRows = await prisma.orderPayment.groupBy({
+        by: ["paymentMethodId"],
+        where: { orderId: { in: orderIds } },
+        _sum: { amount: true },
+        _count: { id: true },
+      })
+      const methods   = await prisma.paymentMethod.findMany({ where: { id: { in: paymentRows.map(r => r.paymentMethodId) } } })
+      const methodMap = Object.fromEntries(methods.map(m => [m.id, m.name]))
+      paymentBreakdown = paymentRows
+        .map(r => ({
+          name:   methodMap[r.paymentMethodId] || "Otro",
+          amount: Number(r._sum.amount ?? 0),
+          count:  r._count.id,
+          pct:    totalRevenue > 0 ? Math.round((Number(r._sum.amount ?? 0) / totalRevenue) * 100) : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount)
+    }
+
+    // Tendencia diaria (una query por día, máximo 31 iteraciones)
+    const msPerDay = 86_400_000
+    const dayCount = Math.min(Math.ceil((dateTo - dateFrom) / msPerDay) + 1, 31)
+    const dailyTrend = await Promise.all(
+      Array.from({ length: dayCount }, (_, i) => {
+        const dayStart = new Date(dateFrom.getTime() + i * msPerDay)
+        dayStart.setUTCHours(0, 0, 0, 0)
+        const dayEnd = new Date(dayStart); dayEnd.setUTCHours(23, 59, 59, 999)
+        return Promise.all([
+          prisma.order.aggregate({ where: { createdAt: { gte: dayStart, lte: dayEnd }, status: "COMPLETED" }, _sum: { total: true } }),
+          prisma.order.count({ where: { createdAt: { gte: dayStart, lte: dayEnd }, status: "COMPLETED" } }),
+        ]).then(([agg, cnt]) => ({
+          date:    dayStart.toISOString().split("T")[0],
+          revenue: Number(agg._sum.total ?? 0),
+          orders:  cnt,
+        }))
+      })
+    )
+
+    // Top productos — raw SQL para calcular revenue correcto (price × quantity)
+    let topProducts = []
+    if (orderIds.length > 0) {
+      topProducts = await prisma.$queryRaw`
+        SELECT p.name,
+               CAST(SUM(oi.quantity) AS INT) AS quantity,
+               CAST(SUM(oi.quantity * oi.price) AS FLOAT) AS revenue
+        FROM "OrderItem" oi
+        JOIN "Product" p ON p.id = oi."productId"
+        WHERE oi."orderId" = ANY(${orderIds}::int[])
+        GROUP BY p.id, p.name
+        ORDER BY revenue DESC
+        LIMIT 5
+      `
+      topProducts = topProducts.map(r => ({
+        name: r.name,
+        quantity: Number(r.quantity),
+        revenue: Number(r.revenue),
+      }))
+    }
+
+    return {
+      period: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      summary: { totalRevenue, totalOrders: completedCount, avgTicket, cancelledCount },
+      paymentBreakdown,
+      dailyTrend,
+      topProducts,
+    }
+  },
 }

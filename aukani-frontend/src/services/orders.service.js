@@ -5,4 +5,5 @@ export const ordersService = {
   getById: (id) => api.get(`/orders/${id}`).then(r => r.data),
   cancel: (id) => api.patch(`/orders/${id}/cancel`).then(r => r.data),
   getDailySummary: () => api.get("/orders/summary/daily").then(r => r.data),
+  getAccounting: (params) => api.get("/orders/accounting", { params }).then(r => r.data),
 }
