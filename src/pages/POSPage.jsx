@@ -48,9 +48,13 @@ function ProductCard({ product, onAdd }) {
           <p className="font-mono font-bold text-xs text-white">
             {formatCOP(product.price)}
           </p>
-          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "rgba(255,255,255,0.55)" }}>
-            {product.stock} uds
-          </p>
+          {product.type === "SERVICE" ? (
+            <p className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>Servicio</p>
+          ) : (
+            <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "rgba(255,255,255,0.55)" }}>
+              {product.stock} uds
+            </p>
+          )}
         </div>
       </div>
     </button>
@@ -425,7 +429,7 @@ export default function POSPage() {
   })
 
   const handleAddToCart = (product) => {
-    if (product.stock <= 0) { toast.error("Sin stock disponible"); return }
+    if (product.type !== "SERVICE" && product.stock <= 0) { toast.error("Sin stock disponible"); return }
     addItem(product)
   }
 
