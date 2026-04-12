@@ -9,7 +9,7 @@ import {
   Plus, Minus, Loader2, Package, X, ChevronRight,
   TrendingUp, ShoppingCart, AlertTriangle, Search,
   Edit2, Trash2, Upload, Camera, SlidersHorizontal,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Wrench
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { confirm } from "@/components/ui/ConfirmDialog"
@@ -101,14 +101,24 @@ function ImageUploader({ currentUrl, productId, onUploaded }) {
 function ProductModal({ product, categories, onClose, onSave }) {
   const [form, setForm] = useState({
     name: product?.name || "", price: product?.price || "", cost: product?.cost || "",
+    type: product?.type || "PHYSICAL",
     stock: product?.stock || 0, minStock: product?.minStock || 0,
     barcode: product?.barcode || "", sku: product?.sku || "", categoryId: product?.categoryId || "",
   })
   const [pendingImage, setPendingImage] = useState(null)
+  const isService = form.type === "SERVICE"
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave({ ...form, price: Number(form.price), cost: form.cost ? Number(form.cost) : undefined, stock: Number(form.stock), minStock: Number(form.minStock), categoryId: form.categoryId ? Number(form.categoryId) : undefined }, pendingImage)
+    onSave({
+      ...form,
+      price: Number(form.price),
+      cost: form.cost ? Number(form.cost) : undefined,
+      stock: isService ? 0 : Number(form.stock),
+      minStock: isService ? 0 : Number(form.minStock),
+      barcode: isService ? undefined : (form.barcode || undefined),
+      categoryId: form.categoryId ? Number(form.categoryId) : undefined,
+    }, pendingImage)
   }
 
   const field = (label, key, type = "text", props = {}) => (
@@ -126,20 +136,52 @@ function ProductModal({ product, categories, onClose, onSave }) {
           <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center"><X size={15} /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Tipo */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tipo</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: "PHYSICAL", label: "Producto físico", icon: Package },
+                { value: "SERVICE", label: "Servicio", icon: Wrench },
+              ].map(({ value, label, icon: Icon }) => (
+                <button key={value} type="button"
+                  onClick={() => setForm(f => ({ ...f, type: value }))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all"
+                  style={{
+                    background: form.type === value ? "var(--brand-light)" : "transparent",
+                    borderColor: form.type === value ? "var(--brand)" : "var(--border)",
+                    color: form.type === value ? "var(--brand)" : "var(--text-secondary)",
+                  }}>
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {isService && (
+              <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
+                Los servicios no tienen stock ni código de barras.
+              </p>
+            )}
+          </div>
           <ImageUploader currentUrl={product?.imageUrl} productId={product?.id} onUploaded={v => setPendingImage(v instanceof File ? v : null)} />
           {field("Nombre *", "name", "text", { required: true, autoFocus: true })}
           <div className="grid grid-cols-2 gap-3">
             {field("Precio *", "price", "number", { required: true, min: 0, step: "1" })}
             {field("Costo", "cost", "number", { min: 0, step: "1" })}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {field("Stock inicial", "stock", "number", { min: 0 })}
-            {field("Stock mínimo", "minStock", "number", { min: 0 })}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {field("Código de barras", "barcode")}
-            {field("SKU", "sku")}
-          </div>
+          {!isService && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {field("Stock inicial", "stock", "number", { min: 0 })}
+                {field("Stock mínimo", "minStock", "number", { min: 0 })}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {field("Código de barras", "barcode")}
+                {field("SKU", "sku")}
+              </div>
+            </>
+          )}
+          {isService && <div>{field("SKU", "sku")}</div>}
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Categoría</label>
             <select className="input" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>
@@ -170,7 +212,7 @@ function MovementModal({ type, products, prefilledId, onClose, onSave }) {
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Producto *</label>
             <select className="input" required value={form.productId} onChange={e => setForm(f => ({ ...f, productId: e.target.value }))}>
               <option value="">Seleccionar...</option>
-              {products.map(p => <option key={p.id} value={p.id}>{p.name} — stock: {p.stock}</option>)}
+              {products.filter(p => p.type !== "SERVICE").map(p => <option key={p.id} value={p.id}>{p.name} — stock: {p.stock}</option>)}
             </select>
           </div>
           <div>
@@ -232,16 +274,24 @@ function ProductDrawer({ product, onClose, canExit, canEdit, onEntry, onExit, on
 
         {/* Stats */}
         <div className="p-4 border-b space-y-3" style={{ borderColor: "var(--border)" }}>
-          <div className="col-span-2 rounded-xl p-4 text-center"
-            style={{ background: product.stock <= product.minStock ? "var(--danger-light)" : "var(--brand-light)" }}>
-            <p className="text-xs font-medium mb-1" style={{ color: product.stock <= product.minStock ? "var(--danger)" : "var(--brand)" }}>
-              {product.stock <= product.minStock ? "⚠ Stock bajo" : "Stock actual"}
-            </p>
-            <p className="font-display font-bold text-5xl" style={{ color: product.stock <= product.minStock ? "var(--danger)" : "var(--brand)" }}>
-              {product.stock}
-            </p>
-            <p className="text-xs mt-1" style={{ color: product.stock <= product.minStock ? "var(--danger)" : "var(--brand)" }}>mínimo: {product.minStock}</p>
-          </div>
+          {product.type === "SERVICE" ? (
+            <div className="rounded-xl p-4 text-center" style={{ background: "var(--bg-tertiary)" }}>
+              <Wrench size={28} className="mx-auto mb-2" style={{ color: "var(--text-muted)" }} />
+              <p className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>Servicio prestado</p>
+              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>No gestiona stock</p>
+            </div>
+          ) : (
+            <div className="col-span-2 rounded-xl p-4 text-center"
+              style={{ background: product.stock <= product.minStock ? "var(--danger-light)" : "var(--brand-light)" }}>
+              <p className="text-xs font-medium mb-1" style={{ color: product.stock <= product.minStock ? "var(--danger)" : "var(--brand)" }}>
+                {product.stock <= product.minStock ? "⚠ Stock bajo" : "Stock actual"}
+              </p>
+              <p className="font-display font-bold text-5xl" style={{ color: product.stock <= product.minStock ? "var(--danger)" : "var(--brand)" }}>
+                {product.stock}
+              </p>
+              <p className="text-xs mt-1" style={{ color: product.stock <= product.minStock ? "var(--danger)" : "var(--brand)" }}>mínimo: {product.minStock}</p>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             {[
               { label: "Precio", value: formatCOP(product.price), color: "var(--brand)" },
@@ -256,11 +306,13 @@ function ProductDrawer({ product, onClose, canExit, canEdit, onEntry, onExit, on
           </div>
         </div>
 
-        {/* Acciones */}
-        <div className="flex gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-          <button onClick={() => onEntry(product.id)} className="btn-primary btn-sm flex-1"><Plus size={13} /> Entrada</button>
-          {canExit && <button onClick={() => onExit(product.id)} className="btn-sm flex-1 text-white" style={{ background: "var(--danger)" }}><Minus size={13} /> Salida</button>}
-        </div>
+        {/* Acciones — ocultar para servicios */}
+        {product.type !== "SERVICE" && (
+          <div className="flex gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+            <button onClick={() => onEntry(product.id)} className="btn-primary btn-sm flex-1"><Plus size={13} /> Entrada</button>
+            {canExit && <button onClick={() => onExit(product.id)} className="btn-sm flex-1 text-white" style={{ background: "var(--danger)" }}><Minus size={13} /> Salida</button>}
+          </div>
+        )}
 
         {/* Historial */}
         <div className="px-4 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
@@ -502,7 +554,8 @@ export default function InventoryPage() {
               </thead>
               <tbody>
                 {products.map((p, i) => {
-                  const low = p.stock <= p.minStock
+                  const isService = p.type === "SERVICE"
+                  const low = !isService && p.stock <= p.minStock
                   return (
                     <tr key={p.id} onClick={() => setSelectedProduct(p)}
                       className="border-b transition-colors cursor-pointer hover:opacity-80"
@@ -514,12 +567,21 @@ export default function InventoryPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-center">
-                        <span className="badge font-mono font-bold px-3 py-1"
-                          style={{ background: low ? "var(--danger-light)" : "var(--brand-light)", color: low ? "var(--danger)" : "var(--brand)" }}>
-                          {low && <AlertTriangle size={11} className="inline mr-1" />}{p.stock}
-                        </span>
+                        {isService ? (
+                          <span className="badge text-xs flex items-center gap-1 justify-center"
+                            style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                            <Wrench size={10} /> Servicio
+                          </span>
+                        ) : (
+                          <span className="badge font-mono font-bold px-3 py-1"
+                            style={{ background: low ? "var(--danger-light)" : "var(--brand-light)", color: low ? "var(--danger)" : "var(--brand)" }}>
+                            {low && <AlertTriangle size={11} className="inline mr-1" />}{p.stock}
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-center font-mono text-xs" style={{ color: "var(--text-muted)" }}>{p.minStock}</td>
+                      <td className="px-4 py-2.5 text-center font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                        {isService ? "—" : p.minStock}
+                      </td>
                       <td className="px-4 py-2.5 text-right font-mono font-semibold" style={{ color: "var(--brand)" }}>{formatCOP(p.price)}</td>
                       <td className="px-4 py-2.5 text-right font-mono text-xs" style={{ color: "var(--text-muted)" }}>{p.cost ? formatCOP(p.cost) : "—"}</td>
                       <td className="px-4 py-2.5 text-xs" style={{ color: "var(--text-muted)" }}>{p.category?.name || "—"}</td>

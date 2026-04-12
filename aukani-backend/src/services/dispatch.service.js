@@ -72,15 +72,19 @@ export const dispatchService = {
       for (const item of items) {
         const product = await tx.product.findUnique({ where: { id: item.productId } })
         if (!product || !product.active) throw { statusCode: 404, message: `Producto no encontrado: ${item.productId}` }
-        if (product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}"` }
+
+        const isService = product.type === "SERVICE"
+        if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}"` }
 
         total += Number(product.price) * item.quantity
         dispatchItems.push({ productId: product.id, quantity: item.quantity, price: product.price })
 
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { decrement: item.quantity } },
-        })
+        if (!isService) {
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { decrement: item.quantity } },
+          })
+        }
       }
 
       // Calcular total recibido y vuelto (solo aplica sobre efectivo)
@@ -169,17 +173,20 @@ export const dispatchService = {
         },
       })
 
-      // Registrar movimientos de inventario
+      // Registrar movimientos de inventario (solo productos físicos)
       for (const item of dispatch.items) {
-        await tx.inventoryMovement.create({
-          data: {
-            productId: item.productId,
-            userId: cashierId,
-            type: "SALE",
-            quantity: item.quantity,
-            reason: `Venta mesero - Despacho #${dispatchId}`,
-          },
-        })
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (product && product.type !== "SERVICE") {
+          await tx.inventoryMovement.create({
+            data: {
+              productId: item.productId,
+              userId: cashierId,
+              type: "SALE",
+              quantity: item.quantity,
+              reason: `Venta mesero - Despacho #${dispatchId}`,
+            },
+          })
+        }
       }
 
       // Marcar dispatch como despachado
@@ -205,12 +212,15 @@ export const dispatchService = {
     if (dispatch.status !== "PENDING") throw { statusCode: 409, message: "Solo se pueden cancelar pedidos pendientes" }
 
     return prisma.$transaction(async (tx) => {
-      // Restaurar stock
+      // Restaurar stock solo para productos físicos
       for (const item of dispatch.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        })
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (product && product.type !== "SERVICE") {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          })
+        }
       }
       return tx.dispatchOrder.update({
         where: { id: dispatchId },

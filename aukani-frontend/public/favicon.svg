@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Fondo redondeado -->
+  <rect width="32" height="32" rx="8" fill="#22c55e"/>
+
+  <!-- Letra A estilizada -->
+  <path d="M16 7L23.5 25H20.2L18.5 20.5H13.5L11.8 25H8.5L16 7Z" fill="white"/>
+  <path d="M14.4 18H17.6L16 13.5L14.4 18Z" fill="#22c55e"/>
+</svg>

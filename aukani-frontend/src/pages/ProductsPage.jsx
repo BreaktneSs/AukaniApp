@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { productsService } from "@/services/products.service"
 import { categoriesService } from "@/services/catalog.service"
 import { Plus, Search, Edit2, Trash2, Loader2, Package, X, Camera,
-         Upload, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react"
+         Upload, SlidersHorizontal, ChevronDown, ChevronUp, Wrench } from "lucide-react"
 import toast from "react-hot-toast"
 import { formatCOP } from "@/utils/currency"
 
@@ -119,11 +119,13 @@ function ImageUploader({ currentUrl, productId, onUploaded }) {
 function ProductModal({ product, categories, onClose, onSave }) {
   const [form, setForm] = useState({
     name: product?.name || "", price: product?.price || "",
-    cost: product?.cost || "", stock: product?.stock || 0,
-    minStock: product?.minStock || 0, barcode: product?.barcode || "",
-    sku: product?.sku || "", categoryId: product?.categoryId || "",
+    cost: product?.cost || "", type: product?.type || "PHYSICAL",
+    stock: product?.stock || 0, minStock: product?.minStock || 0,
+    barcode: product?.barcode || "", sku: product?.sku || "",
+    categoryId: product?.categoryId || "",
   })
   const [pendingImage, setPendingImage] = useState(null)
+  const isService = form.type === "SERVICE"
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -131,8 +133,9 @@ function ProductModal({ product, categories, onClose, onSave }) {
       ...form,
       price: Number(form.price),
       cost: form.cost ? Number(form.cost) : undefined,
-      stock: Number(form.stock),
-      minStock: Number(form.minStock),
+      stock: isService ? 0 : Number(form.stock),
+      minStock: isService ? 0 : Number(form.minStock),
+      barcode: isService ? undefined : (form.barcode || undefined),
       categoryId: form.categoryId ? Number(form.categoryId) : undefined,
     }, pendingImage)
   }
@@ -159,6 +162,34 @@ function ProductModal({ product, categories, onClose, onSave }) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Tipo */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tipo</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: "PHYSICAL", label: "Producto físico", icon: Package },
+                { value: "SERVICE", label: "Servicio", icon: Wrench },
+              ].map(({ value, label, icon: Icon }) => (
+                <button key={value} type="button"
+                  onClick={() => setForm(f => ({ ...f, type: value }))}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all"
+                  style={{
+                    background: form.type === value ? "var(--brand-light)" : "transparent",
+                    borderColor: form.type === value ? "var(--brand)" : "var(--border)",
+                    color: form.type === value ? "var(--brand)" : "var(--text-secondary)",
+                  }}>
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {isService && (
+              <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
+                Los servicios no tienen stock ni código de barras.
+              </p>
+            )}
+          </div>
+
           <ImageUploader currentUrl={product?.imageUrl} productId={product?.id}
             onUploaded={(v) => setPendingImage(v instanceof File ? v : null)} />
           {field("Nombre *", "name", "text", { required: true, autoFocus: true })}
@@ -166,14 +197,23 @@ function ProductModal({ product, categories, onClose, onSave }) {
             {field("Precio *", "price", "number", { required: true, min: 0, step: "1" })}
             {field("Costo", "cost", "number", { min: 0, step: "1" })}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {field("Stock inicial", "stock", "number", { min: 0 })}
-            {field("Stock mínimo", "minStock", "number", { min: 0 })}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {field("Código de barras", "barcode")}
-            {field("SKU", "sku")}
-          </div>
+          {!isService && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {field("Stock inicial", "stock", "number", { min: 0 })}
+                {field("Stock mínimo", "minStock", "number", { min: 0 })}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {field("Código de barras", "barcode")}
+                {field("SKU", "sku")}
+              </div>
+            </>
+          )}
+          {isService && (
+            <div>
+              {field("SKU", "sku")}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Categoría</label>
             <select className="input" value={form.categoryId}
@@ -500,13 +540,20 @@ export default function ProductsPage() {
                       {p.cost ? `${formatCOP(p.cost)}` : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <span className="badge font-mono"
-                        style={{
-                          background: p.stock <= p.minStock ? "var(--warning-light)" : "var(--brand-light)",
-                          color: p.stock <= p.minStock ? "var(--warning)" : "var(--brand)",
-                        }}>
-                        {p.stock}
-                      </span>
+                      {p.type === "SERVICE" ? (
+                        <span className="badge font-medium text-xs flex items-center gap-1 justify-end"
+                          style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                          <Wrench size={10} /> Servicio
+                        </span>
+                      ) : (
+                        <span className="badge font-mono"
+                          style={{
+                            background: p.stock <= p.minStock ? "var(--warning-light)" : "var(--brand-light)",
+                            color: p.stock <= p.minStock ? "var(--warning)" : "var(--brand)",
+                          }}>
+                          {p.stock}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-xs" style={{ color: "var(--text-muted)" }}>
                       {p.category?.name || "—"}

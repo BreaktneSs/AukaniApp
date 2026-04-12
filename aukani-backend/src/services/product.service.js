@@ -31,7 +31,7 @@ export const productService = {
     ])
 
     const filtered = lowStock === "true"
-      ? products.filter(p => p.stock <= p.minStock)
+      ? products.filter(p => p.type !== "SERVICE" && p.stock <= p.minStock)
       : products
 
     return { products: filtered, total, page, limit }

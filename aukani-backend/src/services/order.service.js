@@ -14,13 +14,17 @@ export const orderService = {
       for (const item of items) {
         const product = await tx.product.findUnique({ where: { id: item.productId } })
         if (!product || !product.active) throw { statusCode: 404, message: `Producto no encontrado: ID ${item.productId}` }
-        if (product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }
+
+        const isService = product.type === "SERVICE"
+        if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }
 
         total += Number(product.price) * item.quantity
         orderItems.push({ productId: product.id, quantity: item.quantity, price: product.price })
 
-        await tx.product.update({ where: { id: product.id }, data: { stock: { decrement: item.quantity } } })
-        await tx.inventoryMovement.create({ data: { productId: product.id, userId, type: "SALE", quantity: item.quantity, reason: "Venta" } })
+        if (!isService) {
+          await tx.product.update({ where: { id: product.id }, data: { stock: { decrement: item.quantity } } })
+          await tx.inventoryMovement.create({ data: { productId: product.id, userId, type: "SALE", quantity: item.quantity, reason: "Venta" } })
+        }
       }
 
       const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
@@ -73,8 +77,11 @@ export const orderService = {
 
     return prisma.$transaction(async (tx) => {
       for (const item of order.items) {
-        await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } })
-        await tx.inventoryMovement.create({ data: { productId: item.productId, userId, type: "ENTRY", quantity: item.quantity, reason: `Cancelación venta #${orderId}` } })
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (product && product.type !== "SERVICE") {
+          await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } })
+          await tx.inventoryMovement.create({ data: { productId: item.productId, userId, type: "ENTRY", quantity: item.quantity, reason: `Cancelación venta #${orderId}` } })
+        }
       }
       return tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } })
     })
