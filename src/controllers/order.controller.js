@@ -43,4 +43,9 @@ export const orderController = {
   async getDailySummary(req, reply) {
     return reply.send(await orderService.getDailySummary())
   },
+
+  async getAccountingReport(req, reply) {
+    const { from, to } = req.query
+    return reply.send(await orderService.getAccountingReport({ from, to }))
+  },
 }
