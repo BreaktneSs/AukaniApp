@@ -75,7 +75,7 @@ export const inventoryService = {
     return prisma.$queryRaw`
       SELECT id, name, stock, "minStock", barcode, "categoryId"
       FROM "Product"
-      WHERE active = true AND stock <= "minStock"
+      WHERE active = true AND type = 'PHYSICAL' AND stock <= "minStock"
       ORDER BY stock ASC
     `
   },
