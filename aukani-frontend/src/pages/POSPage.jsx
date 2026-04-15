@@ -7,11 +7,12 @@ import { productsService } from "@/services/products.service"
 import { ordersService } from "@/services/orders.service"
 import { shiftsService } from "@/services/shifts.service"
 import { dispatchService } from "@/services/dispatch.service"
+import { accountsService } from "@/services/accounts.service"
 import { paymentMethodsService, categoriesService } from "@/services/catalog.service"
 import {
   Search, X, Plus, Minus, Trash2, ShoppingCart,
   CreditCard, Banknote, Loader2, Package,
-  PlusCircle, Edit2, LogIn, LogOut, Bell,
+  PlusCircle, LogIn, LogOut, Bell, User, UserPlus, AlertTriangle,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { formatCOP, formatNumber } from "@/utils/currency"
@@ -85,48 +86,130 @@ function CartItem({ item, onUpdate, onRemove }) {
 }
 
 // ── SaleTabs ──────────────────────────────────────────────
-function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onRename }) {
-  const [editing, setEditing] = useState(null)
-  const [editVal, setEditVal] = useState("")
-  const inputRef = useRef(null)
+function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount }) {
+  const genericSales = sales.filter(s => s.type !== "account")
+  const accounts = sales.filter(s => s.type === "account")
 
-  const startEdit = (sale, e) => {
-    e.stopPropagation(); setEditing(sale.id); setEditVal(sale.label)
-    setTimeout(() => inputRef.current?.focus(), 50)
+  const renderTab = (sale) => {
+    const isActive = sale.id === activeId
+    const isAccount = sale.type === "account"
+    const count = sale.items.reduce((s, i) => s + i.quantity, 0)
+    return (
+      <div key={sale.id} onClick={() => onSwitch(sale.id)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-t-md cursor-pointer shrink-0 select-none border-t border-l border-r -mb-px transition-all duration-150"
+        style={{
+          background: isActive ? "var(--bg-primary)" : "var(--bg-tertiary)",
+          borderColor: isActive ? "var(--border)" : "transparent",
+          borderBottomColor: isActive ? "var(--bg-primary)" : "transparent",
+          minWidth: "90px", maxWidth: "150px",
+        }}>
+        {isAccount && (
+          <User size={11} className="shrink-0" style={{ color: isActive ? "var(--info)" : "var(--text-muted)" }} />
+        )}
+        <span className="text-xs font-medium truncate flex-1"
+          style={{ color: isActive ? "var(--text-primary)" : "var(--text-muted)" }}>
+          {sale.label}
+        </span>
+        {count > 0 && (
+          <span className="text-xs px-1 rounded shrink-0" style={{
+            background: isAccount ? "var(--info-light)" : "var(--brand-light)",
+            color: isAccount ? "var(--info)" : "var(--brand)",
+            fontSize: "10px",
+          }}>{count}</span>
+        )}
+        <button onClick={e => { e.stopPropagation(); onClose(sale.id) }}
+          className="shrink-0 opacity-30 hover:opacity-100 ml-0.5" style={{ color: "var(--danger)" }}>
+          <X size={11} />
+        </button>
+      </div>
+    )
   }
-  const confirmEdit = (id) => { if (editVal.trim()) onRename(id, editVal.trim()); setEditing(null) }
 
   return (
-    <div className="flex items-center gap-1 px-3 pt-2 overflow-x-auto border-b shrink-0"
-      style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
-      {sales.map(sale => {
-        const isActive = sale.id === activeId
-        const count = sale.items.reduce((s, i) => s + i.quantity, 0)
-        return (
-          <div key={sale.id} onClick={() => onSwitch(sale.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-t-md cursor-pointer shrink-0 select-none border-t border-l border-r -mb-px transition-all duration-150"
-            style={{ background: isActive ? "var(--bg-primary)" : "var(--bg-tertiary)", borderColor: isActive ? "var(--border)" : "transparent", borderBottomColor: isActive ? "var(--bg-primary)" : "transparent", minWidth: "100px", maxWidth: "160px" }}>
-            {editing === sale.id ? (
-              <input ref={inputRef} value={editVal} onChange={e => setEditVal(e.target.value)}
-                onBlur={() => confirmEdit(sale.id)}
-                onKeyDown={e => { if (e.key === "Enter") confirmEdit(sale.id); if (e.key === "Escape") setEditing(null) }}
-                onClick={e => e.stopPropagation()}
-                className="text-xs w-full outline-none font-medium"
-                style={{ background: "transparent", color: "var(--text-primary)" }} />
-            ) : (
-              <>
-                <span className="text-xs font-medium truncate flex-1" style={{ color: isActive ? "var(--text-primary)" : "var(--text-muted)" }}>{sale.label}</span>
-                {count > 0 && <span className="text-xs px-1 rounded shrink-0" style={{ background: "var(--brand-light)", color: "var(--brand)", fontSize: "10px" }}>{count}</span>}
-                {isActive && <button onClick={e => startEdit(sale, e)} className="shrink-0 opacity-40 hover:opacity-100"><Edit2 size={10} /></button>}
-                <button onClick={e => { e.stopPropagation(); onClose(sale.id) }} className="shrink-0 opacity-30 hover:opacity-100 ml-0.5" style={{ color: "var(--danger)" }}><X size={11} /></button>
-              </>
-            )}
-          </div>
-        )
-      })}
-      <button onClick={onNew} className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100" style={{ color: "var(--text-muted)" }} title="Nueva venta">
+    <div className="tabs-no-scrollbar flex items-center gap-1 px-2 pt-2 overflow-x-auto border-b shrink-0"
+      style={{ borderColor: "var(--border)", background: "var(--bg-secondary)", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+
+      {/* Ventas genéricas */}
+      {genericSales.map(sale => renderTab(sale))}
+      <button onClick={onNew}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100"
+        style={{ color: "var(--text-muted)" }} title="Nueva venta">
         <PlusCircle size={15} />
       </button>
+
+      {/* Separador */}
+      <div className="h-5 w-px mx-1.5 shrink-0" style={{ background: "var(--border)" }} />
+
+      {/* Cuentas abiertas */}
+      {accounts.map(sale => renderTab(sale))}
+      <button onClick={onNewAccount}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100"
+        style={{ color: "var(--info)" }} title="Nueva cuenta">
+        <UserPlus size={15} />
+      </button>
+    </div>
+  )
+}
+
+// ── Modal nueva cuenta ────────────────────────────────────
+function NewAccountModal({ onConfirm, onClose }) {
+  const [name, setName] = useState("")
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div className="card p-5 w-full max-w-xs animate-slide-up" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: "var(--info-light)" }}>
+            <User size={15} style={{ color: "var(--info)" }} />
+          </div>
+          <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Nueva cuenta</h3>
+        </div>
+        <form onSubmit={e => { e.preventDefault(); if (name.trim()) { onConfirm(name.trim()); onClose() } }}
+          className="space-y-3">
+          <input
+            type="text"
+            autoFocus
+            className="input"
+            placeholder="Nombre del cliente o mesa"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={30}
+          />
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button type="submit" disabled={!name.trim()} className="btn-md flex-1 text-white font-semibold"
+              style={{ background: "var(--info)" }}>
+              Abrir cuenta
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal confirmación cierre de cuenta ───────────────────
+function CloseAccountWarningModal({ account, onConfirm, onClose }) {
+  const count = account?.items.reduce((s, i) => s + i.quantity, 0) || 0
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div className="card p-5 w-full max-w-xs animate-slide-up" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle size={18} style={{ color: "var(--warning)" }} />
+          <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>¿Cerrar cuenta?</h3>
+        </div>
+        <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>
+          La cuenta <strong>"{account?.label}"</strong> tiene{" "}
+          <strong>{count} producto{count !== 1 ? "s" : ""}</strong> pendiente{count !== 1 ? "s" : ""}.
+          Se perderán si cierras la pestaña sin cobrar.
+        </p>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+          <button onClick={onConfirm} className="btn-danger btn-md flex-1">Cerrar cuenta</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -315,15 +398,20 @@ export default function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState("")
   const [showPayment, setShowPayment] = useState(false)
   const [showCloseShift, setShowCloseShift] = useState(false)
+  const [showNewAccount, setShowNewAccount] = useState(false)
+  const [confirmCloseAccount, setConfirmCloseAccount] = useState(null) // sale id
   const [payments, setPayments] = useState([])
   const searchRef = useRef(null)
   const qc = useQueryClient()
 
   const navigate = useNavigate()
-  const { sales, activeId, shiftId, setShift, newSale, switchSale, closeSale, renameSale, addItem, removeItem, updateQuantity, clearActive, getActive, getTotal } = useCartStore()
+  const { sales, activeId, shiftId, resetForNewShift, newSale, newAccount, switchSale, closeSale, addItem, removeItem, updateQuantity, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems } = useCartStore()
   const active = getActive()
   const items = active?.items || []
-  const total = getTotal()
+  const remoteItems = active?.type === "account" ? (active?.remoteItems || []) : []
+  const total = items.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+            + remoteItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+  const openAccounts = sales.filter(s => s.type === "account")
 
   // Turno
   const { data: shift, isLoading: shiftLoading, refetch: refetchShift } = useQuery({
@@ -333,7 +421,33 @@ export default function POSPage() {
     refetchOnWindowFocus: false,
     refetchInterval: 60_000, // Actualiza cada minuto automáticamente
   })
-  useEffect(() => { if (shift?.id) setShift(shift.id) }, [shift])
+  useEffect(() => {
+    if (shift?.id) {
+      // Solo sincronizar el shiftId en el store, sin tocar las ventas
+      useCartStore.setState({ shiftId: shift.id })
+    }
+  }, [shift?.id])
+
+  // Cuentas abiertas del turno — polling cada 10s para actualizar remoteItems
+  const { data: backendAccounts = [] } = useQuery({
+    queryKey: ["accounts-shift", shift?.id],
+    queryFn: () => accountsService.getByShift(shift.id),
+    enabled: !!shift?.id,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+  })
+  useEffect(() => {
+    for (const ba of backendAccounts) {
+      const remoteItems = ba.items.map(i => ({
+        id: i.productId,
+        name: i.product?.name || "",
+        price: i.price,
+        quantity: i.quantity,
+        fromAccount: true,
+      }))
+      updateAccountRemoteItems(ba.id, remoteItems)
+    }
+  }, [backendAccounts])
 
   // Pedidos de despacho pendientes — polling cada 5s
   const { data: pendingDispatches = [] } = useQuery({
@@ -391,7 +505,7 @@ export default function POSPage() {
   // Abrir turno
   const openShift = useMutation({
     mutationFn: (cash) => shiftsService.open(cash),
-    onSuccess: (data) => { setShift(data.id); qc.invalidateQueries({ queryKey: ["shift-mine"] }); toast.success("Turno abierto") },
+    onSuccess: (data) => { resetForNewShift(data.id); qc.invalidateQueries({ queryKey: ["shift-mine"] }); toast.success("Turno abierto") },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
 
@@ -399,7 +513,7 @@ export default function POSPage() {
   const closeShiftMut = useMutation({
     mutationFn: (data) => shiftsService.close(shift.id, data),
     onSuccess: () => {
-      setShift(null)
+      useCartStore.setState({ shiftId: null })
       setShowCloseShift(false)
       setShowPayment(false)
       // Invalidar y forzar refetch para que aparezca la pantalla de apertura
@@ -407,7 +521,20 @@ export default function POSPage() {
       qc.invalidateQueries({ queryKey: ["shift-mine"] })
       toast.success("Turno cerrado correctamente")
     },
-    onError: e => toast.error(e.response?.data?.error || "Error"),
+    onError: (e) => {
+      const msg = e.response?.data?.error || ""
+      if (e.response?.status === 409 && msg.includes("cerrado")) {
+        // El turno ya estaba cerrado — limpiar UI igual que en onSuccess
+        useCartStore.setState({ shiftId: null })
+        setShowCloseShift(false)
+        setShowPayment(false)
+        qc.removeQueries({ queryKey: ["shift-mine"] })
+        qc.invalidateQueries({ queryKey: ["shift-mine"] })
+        toast.success("Turno cerrado correctamente")
+      } else {
+        toast.error(msg || "Error al cerrar turno")
+      }
+    },
   })
 
   // Venta
@@ -419,6 +546,7 @@ export default function POSPage() {
       closeSale(activeId); setShowPayment(false)
       qc.invalidateQueries({ queryKey: ["products-all"] })
       qc.invalidateQueries({ queryKey: ["shift-mine"] })
+      qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
     },
     onError: e => toast.error(e.response?.data?.error || "Error al registrar venta"),
   })
@@ -428,22 +556,30 @@ export default function POSPage() {
     addItem(product)
   }
 
+  const handleTabClose = (id) => {
+    const sale = sales.find(s => s.id === id)
+    if (sale?.type === "account") {
+      setConfirmCloseAccount(id)
+      return
+    }
+    closeSale(id)
+    setShowPayment(false)
+  }
+
   const handleSell = () => {
     if (!shiftId) { toast.error("Abre un turno antes de vender"); return }
     if (items.length === 0) return
     const paid = payments.reduce((s, p) => s + (p.amount || 0), 0)
     if (paid < total) { toast.error(`Falta ${formatCOP(total - paid)} por pagar`); return }
+    const allItems = [
+      ...items.map(i => ({ productId: i.id, quantity: i.quantity })),
+      ...remoteItems.map(i => ({ productId: i.id, quantity: i.quantity })),
+    ]
     createSale({
       shiftId,
-      items: items.map(i => ({ productId: i.id, quantity: i.quantity })),
-      // Enviar solo el valor de la venta por método, no lo que el cliente pagó de más
-      payments: payments
-        .filter(p => (p.amount || 0) > 0)
-        .map(p => ({
-          paymentMethodId: p.paymentMethodId,
-          // Si hay un solo método de pago y hay cambio, registrar solo el total de la venta
-          amount: p.amount,
-        })),
+      items: allItems,
+      payments: payments.filter(p => (p.amount || 0) > 0).map(p => ({ paymentMethodId: p.paymentMethodId, amount: p.amount })),
+      ...(active?.type === "account" && active?.backendId && { accountId: active.backendId }),
     })
   }
 
@@ -466,13 +602,13 @@ export default function POSPage() {
         sales={sales} activeId={activeId}
         onSwitch={(id) => { switchSale(id); setShowPayment(false); setQuery("") }}
         onNew={() => { newSale(); setShowPayment(false); setQuery("") }}
-        onClose={(id) => { closeSale(id); setShowPayment(false) }}
-        onRename={renameSale}
+        onClose={handleTabClose}
+        onNewAccount={() => setShowNewAccount(true)}
       />
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Panel izquierdo */}
-        <div className="flex-1 flex flex-col overflow-hidden p-3 gap-2">
+      {/* Panel izquierdo */}
+      <div className="flex-1 flex flex-col overflow-hidden p-3 gap-2">
 
           {/* Búsqueda + widget despachos + cerrar turno */}
           <div className="flex items-center gap-2">
@@ -513,11 +649,24 @@ export default function POSPage() {
               )}
             </button>
 
-            <button onClick={() => { refetchShift(); setShowCloseShift(true) }}
+            <button
+              onClick={() => {
+                if (openAccounts.length > 0) {
+                  toast.error(`Tienes ${openAccounts.length} cuenta${openAccounts.length !== 1 ? "s" : ""} abierta${openAccounts.length !== 1 ? "s" : ""}. Ciérralas antes de cerrar el turno`)
+                  return
+                }
+                refetchShift(); setShowCloseShift(true)
+              }}
               className="btn-md shrink-0 flex items-center gap-1.5 text-sm font-medium"
               style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
               <LogOut size={15} />
               <span className="hidden sm:inline">Cerrar turno</span>
+              {openAccounts.length > 0 && (
+                <span className="w-4 h-4 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0"
+                  style={{ background: "var(--danger)", fontSize: "10px" }}>
+                  {openAccounts.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -560,25 +709,52 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Carrito */}
-        <div className="w-full md:w-80 lg:w-96 flex flex-col border-t md:border-t-0 md:border-l"
-          style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
-          <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
-            <div className="flex items-center gap-2">
-              <ShoppingCart size={15} style={{ color: "var(--brand)" }} />
-              <span className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{active?.label || "Carrito"}</span>
-              {items.length > 0 && <span className="badge text-white text-xs px-1.5" style={{ background: "var(--brand)" }}>{items.reduce((s, i) => s + i.quantity, 0)}</span>}
-            </div>
-            {items.length > 0 && <button onClick={clearActive} className="text-xs btn-ghost px-2 py-1 rounded" style={{ color: "var(--danger)" }}>Limpiar</button>}
-          </div>
+      {/* Carrito */}
+      <div className="w-full md:w-80 lg:w-96 flex flex-col border-t md:border-t-0 md:border-l"
+        style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
 
-          <div className="flex-1 overflow-y-auto px-4">
-            {items.length === 0 ? (
+          <div className="flex-1 overflow-y-auto px-4 pt-2">
+            {items.length === 0 && remoteItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 py-12">
                 <ShoppingCart size={28} style={{ color: "var(--bg-tertiary)" }} />
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>Carrito vacío</p>
               </div>
-            ) : items.map(item => <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem} />)}
+            ) : (
+              <>
+                {items.length > 0 && (
+                  <>
+                    <div className="flex justify-end py-1">
+                      <button onClick={clearActive} className="text-xs btn-ghost px-2 py-0.5 rounded" style={{ color: "var(--danger)" }}>Limpiar</button>
+                    </div>
+                    {items.map(item => <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem} />)}
+                  </>
+                )}
+                {remoteItems.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 py-2 mt-1">
+                      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+                      <span className="text-xs font-medium shrink-0" style={{ color: "var(--info)" }}>
+                        Pedidos mesero
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+                    </div>
+                    {remoteItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
+                          <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{formatCOP(item.price)}</p>
+                        </div>
+                        <span className="text-xs px-2 py-0.5 rounded font-mono font-bold"
+                          style={{ background: "var(--info-light)", color: "var(--info)" }}>×{item.quantity}</span>
+                        <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
+                          {formatCOP(Number(item.price) * item.quantity)}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
           </div>
 
           <div className="p-4 border-t space-y-3" style={{ borderColor: "var(--border)" }}>
@@ -588,7 +764,7 @@ export default function POSPage() {
             </div>
 
             {!showPayment ? (
-              <button onClick={() => setShowPayment(true)} disabled={items.length === 0} className="btn-primary btn-lg w-full">
+              <button onClick={() => setShowPayment(true)} disabled={items.length === 0 && remoteItems.length === 0} className="btn-primary btn-lg w-full">
                 <CreditCard size={17} /> Cobrar
               </button>
             ) : (
@@ -649,6 +825,30 @@ export default function POSPage() {
       {showCloseShift && shift && (
         <CloseShiftModal shift={shift} onClose={() => setShowCloseShift(false)}
           onConfirm={(data) => closeShiftMut.mutate(data)} loading={closeShiftMut.isPending} />
+      )}
+
+      {showNewAccount && (
+        <NewAccountModal
+          onConfirm={async (name) => {
+            try {
+              const { nextId } = useCartStore.getState()
+              newAccount(name, null)
+              const created = await accountsService.create(shift.id, name)
+              setAccountBackendId(nextId, created.id)
+              qc.invalidateQueries({ queryKey: ["accounts-shift", shift.id] })
+            } catch { /* backend error no impide el tab local */ }
+            setShowPayment(false); setQuery("")
+          }}
+          onClose={() => setShowNewAccount(false)}
+        />
+      )}
+
+      {confirmCloseAccount && (
+        <CloseAccountWarningModal
+          account={sales.find(s => s.id === confirmCloseAccount)}
+          onConfirm={() => { closeSale(confirmCloseAccount); setShowPayment(false); setConfirmCloseAccount(null) }}
+          onClose={() => setConfirmCloseAccount(null)}
+        />
       )}
     </div>
   )

@@ -57,7 +57,7 @@ export const shiftService = {
     const shift = await prisma.shift.findUnique({
       where: { id: shiftId },
       include: {
-        orders: { where: { status: "COMPLETED" }, include: { payments: true } },
+        orders: { where: { status: { in: ["COMPLETED", "PARTIAL_REFUND"] } }, include: { payments: true } },
         shiftPayments: true,
       },
     })

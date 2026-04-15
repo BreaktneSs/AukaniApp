@@ -1,4 +1,5 @@
 import prisma from "../config/prisma.js"
+import { accountService } from "./account.service.js"
 
 export const dispatchService = {
 
@@ -56,7 +57,7 @@ export const dispatchService = {
 
   // ── Pedidos de despacho ───────────────────────────────────
 
-  async createDispatch({ subShiftId, items, payments }) {
+  async createDispatch({ subShiftId, items, payments = [], accountId = null }) {
     const subShift = await prisma.subShift.findUnique({
       where: { id: subShiftId },
       include: { parentShift: true },
@@ -65,10 +66,19 @@ export const dispatchService = {
       throw { statusCode: 400, message: "No tienes un turno de mesero abierto" }
     }
 
+    // Validar que la cuenta pertenezca a la caja principal vinculada
+    if (accountId) {
+      const account = await prisma.account.findUnique({ where: { id: accountId } })
+      if (!account || account.status !== "OPEN" || account.shiftId !== subShift.parentShiftId) {
+        throw { statusCode: 400, message: "Cuenta no válida o cerrada" }
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
       let total = 0
       const dispatchItems = []
 
+      // 1 — Validar productos y calcular total (sin tocar stock aún)
       for (const item of items) {
         const product = await tx.product.findUnique({ where: { id: item.productId } })
         if (!product || !product.active) throw { statusCode: 404, message: `Producto no encontrado: ${item.productId}` }
@@ -77,52 +87,61 @@ export const dispatchService = {
         if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}"` }
 
         total += Number(product.price) * item.quantity
-        dispatchItems.push({ productId: product.id, quantity: item.quantity, price: product.price })
+        dispatchItems.push({ productId: product.id, quantity: item.quantity, price: product.price, isService })
+      }
 
-        if (!isService) {
+      // 2 — Validar pago ANTES de descontar stock
+      let cashReceived = 0
+      let change = 0
+      let netPayments = []
+
+      if (!accountId) {
+        const totalReceived = payments.reduce((s, p) => s + Number(p.amount), 0)
+        if (totalReceived < total) throw { statusCode: 400, message: `Pago insuficiente. Total: $${total}, Recibido: $${totalReceived}` }
+
+        const cashMethod = await tx.paymentMethod.findFirst({ where: { name: "Efectivo", active: true } })
+        const cashPayment = payments.find(p => p.paymentMethodId === cashMethod?.id)
+        const cashAmount = Number(cashPayment?.amount || 0)
+
+        netPayments = payments.map((p, idx, arr) => {
+          if (arr.length === 1) return { paymentMethodId: p.paymentMethodId, amount: total }
+          if (idx === arr.length - 1) {
+            const prev = arr.slice(0, idx).reduce((s, x) => s + Number(x.amount), 0)
+            return { paymentMethodId: p.paymentMethodId, amount: Math.max(0, total - prev) }
+          }
+          return { paymentMethodId: p.paymentMethodId, amount: Number(p.amount) }
+        }).filter(p => p.amount > 0)
+
+        const netCash = netPayments.find(p => p.paymentMethodId === cashMethod?.id)?.amount || 0
+        cashReceived = totalReceived
+        change = Math.max(0, cashAmount - netCash)
+      }
+
+      // 3 — Descontar stock solo después de validar todo
+      for (const item of dispatchItems) {
+        if (!item.isService) {
           await tx.product.update({
-            where: { id: product.id },
+            where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
           })
         }
       }
 
-      // Calcular total recibido y vuelto (solo aplica sobre efectivo)
-      const totalReceived = payments.reduce((s, p) => s + Number(p.amount), 0)
-      if (totalReceived < total) throw { statusCode: 400, message: `Pago insuficiente. Total: $${total}, Recibido: $${totalReceived}` }
-
-      // Vuelto solo en efectivo — la diferencia entre lo recibido en efectivo y lo que corresponde
-      const cashMethod = await tx.paymentMethod.findFirst({ where: { name: "Efectivo", active: true } })
-      const cashPayment = payments.find(p => p.paymentMethodId === cashMethod?.id)
-      const cashAmount = Number(cashPayment?.amount || 0)
-
-      // Distribuir pagos netos (sin sobrepago)
-      const netPayments = payments.map((p, idx, arr) => {
-        if (arr.length === 1) return { paymentMethodId: p.paymentMethodId, amount: total }
-        if (idx === arr.length - 1) {
-          const prev = arr.slice(0, idx).reduce((s, x) => s + Number(x.amount), 0)
-          return { paymentMethodId: p.paymentMethodId, amount: Math.max(0, total - prev) }
-        }
-        return { paymentMethodId: p.paymentMethodId, amount: Number(p.amount) }
-      }).filter(p => p.amount > 0)
-
-      // Vuelto = lo que el cliente dio de más en efectivo
-      const netCash = netPayments.find(p => p.paymentMethodId === cashMethod?.id)?.amount || 0
-      const change = cashAmount - netCash
-
       const dispatch = await tx.dispatchOrder.create({
         data: {
           subShiftId,
+          accountId: accountId || null,
           total,
-          cashReceived: totalReceived,
-          change: Math.max(0, change),
-          items: { create: dispatchItems },
-          payments: { create: netPayments },
+          cashReceived,
+          change,
+          items: { create: dispatchItems.map(({ productId, quantity, price }) => ({ productId, quantity, price })) },
+          ...(netPayments.length > 0 && { payments: { create: netPayments } }),
         },
         include: {
           items: { include: { product: { select: { id: true, name: true, imageUrl: true } } } },
           payments: { include: { paymentMethod: true } },
           subShift: { include: { user: { select: { id: true, name: true } } } },
+          account: { select: { id: true, name: true } },
         },
       })
 
@@ -134,22 +153,61 @@ export const dispatchService = {
     const dispatch = await prisma.dispatchOrder.findUnique({
       where: { id: dispatchId },
       include: {
-        items: true,
+        items: { include: { product: true } },
         payments: { include: { paymentMethod: true } },
         subShift: { include: { parentShift: true } },
+        account: { select: { id: true, name: true } },
       },
     })
 
     if (!dispatch) throw { statusCode: 404, message: "Pedido no encontrado" }
     if (dispatch.status !== "PENDING") throw { statusCode: 409, message: "El pedido ya fue procesado" }
 
-    // Validar que el cajero sea dueño de la caja principal
     if (dispatch.subShift.parentShift.userId !== cashierId) {
       throw { statusCode: 403, message: "No tienes permiso para despachar este pedido" }
     }
 
+    // ── Despacho a cuenta ──────────────────────────────────
+    if (dispatch.accountId) {
+      return prisma.$transaction(async (tx) => {
+        // Registrar movimientos de inventario
+        for (const item of dispatch.items) {
+          if (item.product.type !== "SERVICE") {
+            await tx.inventoryMovement.create({
+              data: {
+                productId: item.productId,
+                userId: cashierId,
+                type: "SALE",
+                quantity: item.quantity,
+                reason: `Cuenta "${dispatch.account.name}" - Despacho #${dispatchId}`,
+              },
+            })
+          }
+        }
+
+        // Agregar items a la cuenta (upsert)
+        await accountService.addItems(
+          dispatch.accountId,
+          dispatch.items.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+          tx
+        )
+
+        const updatedDispatch = await tx.dispatchOrder.update({
+          where: { id: dispatchId },
+          data: { status: "DISPATCHED", dispatchedAt: new Date() },
+          include: {
+            items: { include: { product: { select: { id: true, name: true } } } },
+            subShift: { include: { user: { select: { id: true, name: true } } } },
+            account: { select: { id: true, name: true } },
+          },
+        })
+
+        return { dispatch: updatedDispatch, accountId: dispatch.accountId }
+      })
+    }
+
+    // ── Despacho normal → crea Order ──────────────────────
     return prisma.$transaction(async (tx) => {
-      // Crear la orden real en la caja principal con los métodos de pago del despacho
       const parentShiftId = dispatch.subShift.parentShiftId
 
       const order = await tx.order.create({
@@ -173,10 +231,8 @@ export const dispatchService = {
         },
       })
 
-      // Registrar movimientos de inventario (solo productos físicos)
       for (const item of dispatch.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
-        if (product && product.type !== "SERVICE") {
+        if (item.product.type !== "SERVICE") {
           await tx.inventoryMovement.create({
             data: {
               productId: item.productId,
@@ -189,13 +245,13 @@ export const dispatchService = {
         }
       }
 
-      // Marcar dispatch como despachado
       const updatedDispatch = await tx.dispatchOrder.update({
         where: { id: dispatchId },
         data: { status: "DISPATCHED", dispatchedAt: new Date() },
         include: {
           items: { include: { product: { select: { id: true, name: true } } } },
           subShift: { include: { user: { select: { id: true, name: true } } } },
+          account: { select: { id: true, name: true } },
         },
       })
 
@@ -240,6 +296,7 @@ export const dispatchService = {
       include: {
         items: { include: { product: { select: { id: true, name: true, imageUrl: true } } } },
         subShift: { include: { user: { select: { id: true, name: true } } } },
+        account: { select: { id: true, name: true } },
       },
     })
   },
@@ -253,6 +310,7 @@ export const dispatchService = {
       include: {
         items: { include: { product: { select: { id: true, name: true } } } },
         subShift: { include: { user: { select: { id: true, name: true } } } },
+        account: { select: { id: true, name: true } },
       },
     })
   },

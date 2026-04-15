@@ -1,7 +1,7 @@
 import prisma from "../config/prisma.js"
 
 export const orderService = {
-  async createSale({ items, payments, userId, shiftId }) {
+  async createSale({ items, payments, userId, shiftId, accountId = null }) {
     const shift = await prisma.shift.findUnique({ where: { id: shiftId } })
     if (!shift || shift.status !== "OPEN") {
       throw { statusCode: 400, message: "Debes tener un turno abierto para realizar ventas" }
@@ -65,6 +65,14 @@ export const orderService = {
           payments: { include: { paymentMethod: true } },
         },
       })
+
+      // Si la venta cierra una cuenta abierta, marcarla como CLOSED
+      if (accountId) {
+        await tx.account.update({
+          where: { id: accountId },
+          data: { status: "CLOSED", closedAt: new Date() },
+        })
+      }
 
       return { ...order, change: totalPaid - total }
     })
