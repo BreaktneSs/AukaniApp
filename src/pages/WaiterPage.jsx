@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dispatchService } from "@/services/dispatch.service"
+import { accountsService } from "@/services/accounts.service"
 import { productsService } from "@/services/products.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
 import { formatCOP, formatNumber } from "@/utils/currency"
 import {
   Search, X, Plus, Minus, Trash2, Send, LogIn, LogOut,
-  Loader2, Package, CheckCircle, Clock, XCircle, ChevronRight
+  Loader2, Package, CheckCircle, User,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { confirm } from "@/components/ui/ConfirmDialog"
@@ -271,12 +272,81 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
   )
 }
 
+// ── Panel enviar a cuenta ─────────────────────────────────
+function SendToAccountPanel({ items, subShiftId, parentShiftId, onSent, onCancel }) {
+  const [selectedAccountId, setSelectedAccountId] = useState(null)
+
+  const { data: accounts = [], isLoading } = useQuery({
+    queryKey: ["accounts-shift", parentShiftId],
+    queryFn: () => accountsService.getByShift(parentShiftId),
+    enabled: !!parentShiftId,
+    refetchInterval: 10_000,
+  })
+
+  const { mutate: send, isPending } = useMutation({
+    mutationFn: (accId) => dispatchService.createDispatch({
+      subShiftId,
+      items: items.map(i => ({ productId: i.id, quantity: i.quantity })),
+      accountId: accId,
+    }),
+    onSuccess: () => { toast.success("✅ Enviado a la cuenta"); onSent() },
+    onError: e => toast.error(e.response?.data?.error || "Error al enviar"),
+  })
+
+  return (
+    <div className="space-y-3 animate-slide-up">
+      <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
+        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Seleccionar cuenta</p>
+        {isLoading ? (
+          <div className="flex justify-center py-3">
+            <Loader2 size={16} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+          </div>
+        ) : accounts.length === 0 ? (
+          <p className="text-xs text-center py-3" style={{ color: "var(--text-muted)" }}>
+            No hay cuentas abiertas en esta caja
+          </p>
+        ) : (
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {accounts.map(acc => (
+              <button key={acc.id}
+                onClick={() => setSelectedAccountId(acc.id)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all"
+                style={{
+                  background: selectedAccountId === acc.id ? "var(--info-light)" : "var(--bg-primary)",
+                  border: `1px solid ${selectedAccountId === acc.id ? "var(--info)" : "var(--border)"}`,
+                }}>
+                <div className="flex items-center gap-2">
+                  <User size={13} style={{ color: "var(--info)" }} />
+                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{acc.name}</span>
+                </div>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {acc.items.reduce((s, i) => s + i.quantity, 0)} items
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onCancel} className="btn-outline btn-md flex-1">Cancelar</button>
+        <button onClick={() => send(selectedAccountId)} disabled={isPending || !selectedAccountId}
+          className="btn-md flex-1 text-white font-semibold"
+          style={{ background: "var(--info)" }}>
+          {isPending ? <Loader2 size={14} className="animate-spin" /> : <User size={14} />}
+          Agregar a cuenta
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── WaiterPage ────────────────────────────────────────────
 export default function WaiterPage() {
   const [query, setQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("")
   const [cart, setCart] = useState([])
   const [showSend, setShowSend] = useState(false)
+  const [showAccountSend, setShowAccountSend] = useState(false)
   const searchRef = useRef(null)
   const qc = useQueryClient()
 
@@ -477,18 +547,33 @@ export default function WaiterPage() {
               </span>
             </div>
 
-            {!showSend ? (
-              <button onClick={() => setShowSend(true)} disabled={cart.length === 0}
-                className="btn-primary btn-lg w-full">
-                <Send size={17} /> Cobrar y enviar
-              </button>
-            ) : (
+            {!showSend && !showAccountSend ? (
+              <div className="flex gap-2">
+                <button onClick={() => setShowSend(true)} disabled={cart.length === 0}
+                  className="btn-primary btn-md flex-1">
+                  <Send size={15} /> Cobrar
+                </button>
+                <button onClick={() => setShowAccountSend(true)} disabled={cart.length === 0}
+                  className="btn-md flex-1 text-white font-semibold"
+                  style={{ background: "var(--info)" }}>
+                  <User size={15} /> A cuenta
+                </button>
+              </div>
+            ) : showSend ? (
               <SendOrderPanel
                 items={cart}
                 total={total}
                 subShiftId={subShift.id}
                 onSent={() => { setCart([]); setShowSend(false) }}
                 onCancel={() => setShowSend(false)}
+              />
+            ) : (
+              <SendToAccountPanel
+                items={cart}
+                subShiftId={subShift.id}
+                parentShiftId={subShift.parentShiftId}
+                onSent={() => { setCart([]); setShowAccountSend(false) }}
+                onCancel={() => setShowAccountSend(false)}
               />
             )}
           </div>

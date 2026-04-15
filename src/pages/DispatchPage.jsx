@@ -5,7 +5,7 @@ import { shiftsService } from "@/services/shifts.service"
 import { formatCOP } from "@/utils/currency"
 import {
   Bell, CheckCircle, XCircle, Clock, Package,
-  Loader2, Users, ChevronDown, ChevronUp, X
+  Loader2, Users, ChevronDown, ChevronUp, X, User,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { confirm } from "@/components/ui/ConfirmDialog"
@@ -21,17 +21,18 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
   const change = Number(dispatch.change)
   const cashReceived = Number(dispatch.cashReceived)
   const total = Number(dispatch.total)
+  const isAccountDispatch = !!dispatch.account
 
   return (
     <div className="card overflow-hidden animate-slide-up border-l-4"
-      style={{ borderLeftColor: "var(--warning)" }}>
+      style={{ borderLeftColor: isAccountDispatch ? "var(--info)" : "var(--warning)" }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: "var(--border)", background: "var(--warning-light)" }}>
+        style={{ borderColor: "var(--border)", background: isAccountDispatch ? "var(--info-light)" : "var(--warning-light)" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm"
-            style={{ background: "var(--warning)" }}>
+            style={{ background: isAccountDispatch ? "var(--info)" : "var(--warning)" }}>
             {dispatch.subShift?.user?.name?.[0]?.toUpperCase()}
           </div>
           <div>
@@ -43,9 +44,18 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
             </p>
           </div>
         </div>
-        <span className="font-display font-bold text-xl" style={{ color: "var(--warning)" }}>
-          {formatCOP(total)}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          {isAccountDispatch && (
+            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: "var(--info)", color: "white" }}>
+              <User size={11} /> {dispatch.account.name}
+            </span>
+          )}
+          <span className="font-display font-bold text-xl"
+            style={{ color: isAccountDispatch ? "var(--info)" : "var(--warning)" }}>
+            {formatCOP(total)}
+          </span>
+        </div>
       </div>
 
       {/* Items */}
@@ -78,23 +88,25 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
         ))}
       </div>
 
-      {/* Resumen de caja */}
-      <div className="px-4 py-3 space-y-1.5 border-b" style={{ borderColor: "var(--border)" }}>
-        <div className="flex justify-between text-sm">
-          <span style={{ color: "var(--text-secondary)" }}>Cliente pagó</span>
-          <span className="font-mono font-semibold" style={{ color: "var(--text-primary)" }}>
-            {formatCOP(cashReceived)}
-          </span>
+      {/* Resumen de caja — solo para despachos normales */}
+      {!isAccountDispatch && (
+        <div className="px-4 py-3 space-y-1.5 border-b" style={{ borderColor: "var(--border)" }}>
+          <div className="flex justify-between text-sm">
+            <span style={{ color: "var(--text-secondary)" }}>Cliente pagó</span>
+            <span className="font-mono font-semibold" style={{ color: "var(--text-primary)" }}>
+              {formatCOP(cashReceived)}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm font-bold">
+            <span style={{ color: change > 0 ? "var(--brand)" : "var(--danger)" }}>
+              {change > 0 ? "🔄 Vuelto a devolver" : "❌ Sin vuelto"}
+            </span>
+            <span className="font-mono text-lg" style={{ color: change > 0 ? "var(--brand)" : "var(--text-muted)" }}>
+              {change > 0 ? formatCOP(change) : "—"}
+            </span>
+          </div>
         </div>
-        <div className="flex justify-between text-sm font-bold">
-          <span style={{ color: change > 0 ? "var(--brand)" : "var(--danger)" }}>
-            {change > 0 ? "🔄 Vuelto a devolver" : "❌ Sin vuelto"}
-          </span>
-          <span className="font-mono text-lg" style={{ color: change > 0 ? "var(--brand)" : "var(--text-muted)" }}>
-            {change > 0 ? formatCOP(change) : "—"}
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* Acciones */}
       <div className="flex gap-2 p-3">
@@ -110,9 +122,9 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
           onClick={() => onConfirm(dispatch.id)}
           disabled={confirming}
           className="btn-sm flex-1 text-white font-bold"
-          style={{ background: "var(--brand)" }}>
-          {confirming ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
-          ✅ Despachar
+          style={{ background: isAccountDispatch ? "var(--info)" : "var(--brand)" }}>
+          {confirming ? <Loader2 size={13} className="animate-spin" /> : isAccountDispatch ? <User size={13} /> : <CheckCircle size={13} />}
+          {isAccountDispatch ? "Agregar a cuenta" : "✅ Despachar"}
         </button>
       </div>
     </div>
@@ -171,10 +183,11 @@ export default function DispatchPage() {
 
   const confirmDispatch = useMutation({
     mutationFn: dispatchService.confirmDispatch,
-    onSuccess: () => {
-      toast.success("✅ Pedido despachado")
+    onSuccess: (data) => {
+      toast.success(data?.accountId ? "✅ Agregado a la cuenta" : "✅ Pedido despachado")
       qc.invalidateQueries({ queryKey: ["dispatches-pending"] })
       qc.invalidateQueries({ queryKey: ["dispatches-history"] })
+      qc.invalidateQueries({ queryKey: ["accounts-shift"] })
       qc.invalidateQueries({ queryKey: ["shift-mine"] })
     },
     onError: e => toast.error(e.response?.data?.error || "Error"),
