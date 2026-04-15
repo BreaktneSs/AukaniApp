@@ -46,8 +46,8 @@ export const dispatchController = {
   },
 
   async createDispatch(req, reply) {
-    const { subShiftId, items, payments } = req.body
-    const dispatch = await dispatchService.createDispatch({ subShiftId, items, payments })
+    const { subShiftId, items, payments, accountId } = req.body
+    const dispatch = await dispatchService.createDispatch({ subShiftId, items, payments, accountId })
     auditService.log({
       userId: req.user.id, userName: req.user.name, userRole: req.user.role,
       action: "DISPATCH_CREATE", entity: "DISPATCH", entityId: dispatch.id,

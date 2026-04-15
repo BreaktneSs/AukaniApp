@@ -105,6 +105,7 @@ model Product {
   orderItems    OrderItem[]
   movements     InventoryMovement[]
   dispatchItems DispatchItem[]
+  accountItems  AccountItem[]
 
   @@index([name])
   @@index([barcode])
@@ -130,6 +131,7 @@ model Shift {
   orders        Order[]
   shiftPayments ShiftPayment[]
   subShifts     SubShift[]
+  accounts      Account[]
 
   @@index([userId])
   @@index([status])
@@ -226,6 +228,11 @@ enum DispatchStatus {
   CANCELLED  // Cancelado
 }
 
+enum AccountStatus {
+  OPEN
+  CLOSED
+}
+
 model SubShift {
   id          Int            @id @default(autoincrement())
   userId      Int            // Mesero
@@ -253,6 +260,9 @@ model DispatchOrder {
   notes        String?
   createdAt    DateTime       @default(now())
   dispatchedAt DateTime?
+
+  accountId    Int?
+  account      Account?       @relation(fields: [accountId], references: [id])
 
   subShift  SubShift              @relation(fields: [subShiftId], references: [id])
   items     DispatchItem[]
@@ -288,6 +298,38 @@ model DispatchItem {
   @@index([dispatchOrderId])
 }
 
+// ─── CUENTAS ABIERTAS ────────────────────────────────────
+
+model Account {
+  id        Int           @id @default(autoincrement())
+  shiftId   Int
+  name      String
+  status    AccountStatus @default(OPEN)
+  createdAt DateTime      @default(now())
+  closedAt  DateTime?
+
+  shift     Shift          @relation(fields: [shiftId], references: [id])
+  items     AccountItem[]
+  dispatches DispatchOrder[]
+
+  @@index([shiftId])
+  @@index([status])
+}
+
+model AccountItem {
+  id        Int      @id @default(autoincrement())
+  accountId Int
+  productId Int
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  addedAt   DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([accountId])
+}
+
 // ─── AUDITORÍA ───────────────────────────────────────────
 
 enum AuditAction {
@@ -311,6 +353,9 @@ enum AuditAction {
   DISPATCH_CANCEL
   INVENTORY_ENTRY
   INVENTORY_EXIT
+  ACCOUNT_CREATE
+  ACCOUNT_CLOSE
+  ACCOUNT_ADD_ITEMS
 }
 
 enum AuditEntity {
@@ -322,6 +367,7 @@ enum AuditEntity {
   SUBSHIFT
   DISPATCH
   INVENTORY
+  ACCOUNT
 }
 
 model AuditLog {

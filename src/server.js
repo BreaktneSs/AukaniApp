@@ -17,6 +17,7 @@ import { inventoryRoutes } from "./routes/inventory.routes.js"
 import { catalogRoutes }   from "./routes/catalog.routes.js"
 import { dispatchRoutes }  from "./routes/dispatch.routes.js"
 import { auditRoutes }     from "./routes/audit.routes.js"
+import { accountRoutes }   from "./routes/account.routes.js"
 import { errorHandler }    from "./middlewares/errorHandler.js"
 import prisma              from "./config/prisma.js"
 
@@ -60,6 +61,7 @@ await app.register(shiftRoutes)
 await app.register(inventoryRoutes)
 await app.register(catalogRoutes)
 await app.register(dispatchRoutes)
+await app.register(accountRoutes)
 await app.register(auditRoutes)
 
 // ── Error handler ────────────────────────────────────────
