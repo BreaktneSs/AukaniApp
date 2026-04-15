@@ -135,9 +135,13 @@ function ProductCard({ product, onAdd }) {
           <p className="font-mono font-bold text-base" style={{ color: "var(--brand)" }}>
             {formatCOP(product.price)}
           </p>
-          <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
-            {product.stock} uds
-          </p>
+          {product.type === "SERVICE" ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Servicio</p>
+          ) : (
+            <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--text-muted)" }}>
+              {product.stock} uds
+            </p>
+          )}
         </div>
       </div>
     </button>
@@ -329,7 +333,7 @@ export default function WaiterPage() {
 
   // Carrito
   const addItem = (product) => {
-    if (product.stock <= 0) { toast.error("Sin stock"); return }
+    if (product.type !== "SERVICE" && product.stock <= 0) { toast.error("Sin stock"); return }
     setCart(prev => {
       const ex = prev.find(i => i.id === product.id)
       if (ex) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
