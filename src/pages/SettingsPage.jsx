@@ -10,7 +10,13 @@ import { agentService } from "@/services/agent.service"
 import { confirm } from "@/components/ui/ConfirmDialog"
 import Checkbox from "@/components/ui/Checkbox"
 
-const TABS = ["Negocio", "Impresora", "Usuarios", "Categorías", "Métodos de pago"]
+const ALL_TABS = [
+  { name: "Negocio",         roles: ["ADMIN", "JEFE"] },
+  { name: "Impresora",       roles: ["ADMIN", "JEFE", "VENDEDOR"] },
+  { name: "Usuarios",        roles: ["ADMIN"] },
+  { name: "Categorías",      roles: ["ADMIN", "JEFE"] },
+  { name: "Métodos de pago", roles: ["ADMIN", "JEFE"] },
+]
 
 // ── Usuarios ─────────────────────────────────────────────
 function UsersTab() {
@@ -392,30 +398,30 @@ function BusinessTab() {
 export default function SettingsPage() {
   const [tab, setTab] = useState(0)
   const { user } = useAuthStore()
-  const isAdmin = user?.role === "ADMIN"
 
-  const visibleTabs = isAdmin ? TABS : TABS.filter(t => t !== "Usuarios")
+  const visibleTabs = ALL_TABS.filter(t => t.roles.includes(user?.role))
+  const activeTab = visibleTabs[tab]?.name
 
   return (
     <div className="p-4 md:p-6 space-y-4">
       <h1 className="font-display font-bold text-xl" style={{ color: "var(--text-primary)" }}>Configuración</h1>
 
-      <div className="flex gap-1 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--border)" }}>
         {visibleTabs.map((t, i) => (
-          <button key={t} onClick={() => setTab(i)}
-            className="px-4 py-2 text-sm transition-colors border-b-2 -mb-px"
+          <button key={t.name} onClick={() => setTab(i)}
+            className="px-4 py-2 text-sm transition-colors border-b-2 -mb-px shrink-0"
             style={{ borderColor: tab === i ? "var(--brand)" : "transparent", color: tab === i ? "var(--brand)" : "var(--text-muted)", fontWeight: tab === i ? 600 : 400 }}>
-            {t}
+            {t.name}
           </button>
         ))}
       </div>
 
       <div className="animate-fade-in">
-        {tab === 0 && <BusinessTab />}
-        {tab === 1 && <PrinterTab />}
-        {tab === 2 && isAdmin && <UsersTab />}
-        {tab === (isAdmin ? 3 : 2) && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
-        {tab === (isAdmin ? 4 : 3) && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
+        {activeTab === "Negocio"         && <BusinessTab />}
+        {activeTab === "Impresora"       && <PrinterTab />}
+        {activeTab === "Usuarios"        && <UsersTab />}
+        {activeTab === "Categorías"      && <SimpleListTab queryKey="categories" fetchFn={categoriesService.getAll} createFn={categoriesService.create} deleteFn={categoriesService.delete} label="Categoría" />}
+        {activeTab === "Métodos de pago" && <SimpleListTab queryKey="payment-methods" fetchFn={paymentMethodsService.getAll} createFn={paymentMethodsService.create} deleteFn={paymentMethodsService.delete} label="Método de pago" minItems={1} />}
       </div>
     </div>
   )

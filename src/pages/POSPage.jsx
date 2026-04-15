@@ -539,8 +539,8 @@ export default function POSPage() {
   // Inicializar pago
   useEffect(() => {
     if (showPayment && paymentMethods.length > 0) {
-      const efectivo = paymentMethods.find(m => m.name === "Efectivo")
-      setPayments(efectivo ? [{ paymentMethodId: efectivo.id, amount: "" }] : [])
+      const efectivo = paymentMethods.find(m => m.active && m.name === "Efectivo") || paymentMethods.find(m => m.active)
+      setPayments(efectivo ? [{ paymentMethodId: efectivo.id, amount: 0, rawAmount: "" }] : [])
     }
   }, [showPayment, paymentMethods])
 
@@ -827,47 +827,83 @@ export default function POSPage() {
                 <CreditCard size={17} /> Cobrar
               </button>
             ) : (
-              <div className="space-y-2.5 animate-slide-up">
-                {paymentMethods.filter(m => m.active).map(method => {
-                  const p = payments.find(x => x.paymentMethodId === method.id)
-                  const rawAmt = p?.rawAmount || ""
-                  const displayAmt = rawAmt ? formatNumber(Number(rawAmt)) : ""
+              <div className="space-y-2 animate-slide-up">
+                {payments.map((row, idx) => {
+                  const usedIds = payments.filter(p => p.paymentMethodId !== row.paymentMethodId).map(p => p.paymentMethodId)
+                  const availableMethods = paymentMethods.filter(m => m.active && (m.id === row.paymentMethodId || !usedIds.includes(m.id)))
+                  const displayAmt = row.rawAmount ? formatNumber(Number(row.rawAmount)) : ""
                   return (
-                    <div key={method.id} className="flex items-center gap-2">
-                      <label className="text-xs w-20 shrink-0 font-medium" style={{ color: "var(--text-secondary)" }}>{method.name}</label>
+                    <div key={row.paymentMethodId} className="flex items-center gap-1.5">
+                      <select
+                        value={row.paymentMethodId}
+                        onChange={e => {
+                          const newId = Number(e.target.value)
+                          setPayments(prev => prev.map(p => p.paymentMethodId === row.paymentMethodId
+                            ? { paymentMethodId: newId, amount: 0, rawAmount: "" }
+                            : p
+                          ))
+                        }}
+                        className="input text-sm flex-1 min-w-0"
+                      >
+                        {availableMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
                       <div className="relative flex-1">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: "var(--text-muted)" }}>$</span>
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-muted)" }}>$</span>
                         <input
                           type="text"
                           inputMode="numeric"
-                          className="input text-sm font-mono font-bold pl-6 text-right"
+                          autoFocus={idx === 0}
+                          className="input text-sm font-bold pl-6 text-right h-10"
                           placeholder="0"
                           value={displayAmt}
                           onChange={e => {
                             const digits = e.target.value.replace(/\D/g, "")
-                            setPayments(prev => {
-                              const exists = prev.find(x => x.paymentMethodId === method.id)
-                              const updated = { paymentMethodId: method.id, amount: Number(digits) || 0, rawAmount: digits }
-                              if (exists) return prev.map(x => x.paymentMethodId === method.id ? updated : x)
-                              return [...prev, updated]
-                            })
+                            setPayments(prev => prev.map(p => p.paymentMethodId === row.paymentMethodId
+                              ? { ...p, amount: Number(digits) || 0, rawAmount: digits }
+                              : p
+                            ))
                           }}
                           onKeyDown={e => { if (e.key === "Enter") handleSell() }}
                         />
                       </div>
+                      {payments.length > 1 && (
+                        <button
+                          onClick={() => setPayments(prev => prev.filter(p => p.paymentMethodId !== row.paymentMethodId))}
+                          className="w-9 h-10 rounded flex items-center justify-center shrink-0 btn-ghost"
+                          style={{ color: "var(--danger)" }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
                     </div>
                   )
                 })}
+
+                {/* Agregar método de pago */}
+                {paymentMethods.filter(m => m.active && !payments.some(p => p.paymentMethodId === m.id)).length > 0 && (
+                  <button
+                    onClick={() => {
+                      const available = paymentMethods.filter(m => m.active && !payments.some(p => p.paymentMethodId === m.id))
+                      if (available.length > 0) setPayments(prev => [...prev, { paymentMethodId: available[0].id, amount: 0, rawAmount: "" }])
+                    }}
+                    className="w-full btn-sm flex items-center justify-center gap-1.5 rounded-lg"
+                    style={{ border: "1.5px dashed var(--border)", color: "var(--text-muted)", background: "transparent" }}
+                  >
+                    <Plus size={13} /> Agregar método de pago
+                  </button>
+                )}
+
                 {(() => {
                   const paid = payments.reduce((s, p) => s + (p.amount || 0), 0)
                   const change = paid - total
                   return paid > 0 ? (
                     <div className="flex justify-between text-sm pt-1 border-t" style={{ borderColor: "var(--border)" }}>
                       <span style={{ color: "var(--text-muted)" }}>Cambio</span>
-                      <span className="font-mono font-bold" style={{ color: change >= 0 ? "var(--brand)" : "var(--danger)" }}>{formatCOP(change)}</span>
+                      <span className="font-bold" style={{ color: change >= 0 ? "var(--brand)" : "var(--danger)" }}>{formatCOP(change)}</span>
                     </div>
                   ) : null
                 })()}
+
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => setShowPayment(false)} className="btn-outline btn-md flex-1">Cancelar</button>
                   <button onClick={handleSell} disabled={selling} className="btn-primary btn-md flex-1">
