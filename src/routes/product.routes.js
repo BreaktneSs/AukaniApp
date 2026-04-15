@@ -6,6 +6,7 @@ export async function productRoutes(fastify) {
   // ── Consultas (todos los roles) ──────────────────────
   fastify.get("/products",               { preHandler: allRoles },    productController.getAll)
   fastify.get("/products/search",        { preHandler: allRoles },    productController.search)
+  fastify.get("/products/sku/generate",  { preHandler: adminOrJefe }, productController.generateSku)
   fastify.get("/products/barcode/:code", { preHandler: allRoles },    productController.getByBarcode)
   fastify.get("/products/:id",           { preHandler: allRoles },    productController.getById)
 
