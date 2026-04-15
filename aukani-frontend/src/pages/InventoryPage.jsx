@@ -11,6 +11,7 @@ import {
   Edit2, Trash2, Upload, Camera, SlidersHorizontal,
   ChevronDown, ChevronUp, Wrench
 } from "lucide-react"
+import Checkbox from "@/components/ui/Checkbox"
 import toast from "react-hot-toast"
 import { confirm } from "@/components/ui/ConfirmDialog"
 
@@ -348,7 +349,7 @@ function ProductDrawer({ product, onClose, canExit, canEdit, onEntry, onExit, on
 }
 
 // ── InventoryPage (fusión) ────────────────────────────────
-const EMPTY_FILTERS = { categoryId: "", minPrice: "", maxPrice: "", lowStock: "", sortBy: "name_asc" }
+const EMPTY_FILTERS = { categoryId: "", minPrice: "", maxPrice: "", lowStock: "", type: "", sortBy: "name_asc" }
 
 function sortProducts(products, sortBy) {
   return [...products].sort((a, b) => {
@@ -374,7 +375,7 @@ export default function InventoryPage() {
   const canEdit = ["ADMIN", "JEFE"].includes(user?.role)
 
   const setFilter = useCallback((key, val) => setFilters(f => ({ ...f, [key]: val })), [])
-  const activeFilterCount = [filters.categoryId, filters.minPrice, filters.maxPrice, filters.lowStock].filter(Boolean).length
+  const activeFilterCount = [filters.categoryId, filters.minPrice, filters.maxPrice, filters.lowStock, filters.type].filter(Boolean).length
 
   const { data, isLoading } = useQuery({
     queryKey: ["products-inventory", search, filters],
@@ -389,7 +390,10 @@ export default function InventoryPage() {
 
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoriesService.getAll })
   const rawProducts = data?.products || []
-  const products = sortProducts(rawProducts, filters.sortBy)
+  const filteredByType = filters.type
+    ? rawProducts.filter(p => p.type === filters.type)
+    : rawProducts
+  const products = sortProducts(filteredByType, filters.sortBy)
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["products-inventory"] })
@@ -518,12 +522,27 @@ export default function InventoryPage() {
               <option value="stock_asc">Stock ↑</option>
             </select>
           </div>
-          <div className="col-span-2 md:col-span-4 flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={filters.lowStock === "true"} onChange={e => setFilter("lowStock", e.target.checked ? "true" : "")} className="w-4 h-4 rounded" />
-              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Solo stock bajo</span>
-            </label>
-            {activeFilterCount > 0 && <button onClick={() => setFilters(EMPTY_FILTERS)} className="text-xs btn-ghost px-2 py-1 rounded" style={{ color: "var(--danger)" }}>Limpiar filtros</button>}
+          <div className="col-span-2 md:col-span-4 flex items-center gap-5 flex-wrap pt-1">
+            <Checkbox
+              checked={filters.lowStock === "true"}
+              onChange={e => setFilter("lowStock", e.target.checked ? "true" : "")}
+              label="Solo stock bajo"
+            />
+            <Checkbox
+              checked={filters.type === "PHYSICAL"}
+              onChange={e => setFilter("type", e.target.checked ? "PHYSICAL" : "")}
+              label="Solo productos físicos"
+            />
+            <Checkbox
+              checked={filters.type === "SERVICE"}
+              onChange={e => setFilter("type", e.target.checked ? "SERVICE" : "")}
+              label="Solo servicios"
+            />
+            {activeFilterCount > 0 && (
+              <button onClick={() => setFilters(EMPTY_FILTERS)} className="text-xs btn-ghost px-2 py-1 rounded ml-auto" style={{ color: "var(--danger)" }}>
+                Limpiar filtros
+              </button>
+            )}
           </div>
         </div>
       )}

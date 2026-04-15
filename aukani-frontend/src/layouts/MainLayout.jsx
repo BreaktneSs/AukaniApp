@@ -114,9 +114,11 @@ export default function MainLayout() {
             style={{ color: "var(--text-muted)" }}>
             <Menu size={18} />
           </button>
-          <div className="w-6 h-6 rounded-md flex items-center justify-center font-display font-bold text-white text-xs"
-            style={{ background: "var(--brand)" }}>A</div>
-          <span className="font-display font-bold text-sm" style={{ color: "var(--text-primary)" }}>Aukani</span>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-white text-xs shrink-0"
+            style={{ background: "var(--brand)" }}>
+            {user?.name?.[0]?.toUpperCase()}
+          </div>
+          <span className="font-display font-bold text-sm truncate" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
         </header>
 
         <main className="flex-1 overflow-auto"><Outlet /></main>

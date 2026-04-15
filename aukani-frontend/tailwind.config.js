@@ -6,7 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["'DM Sans'", "sans-serif"],
-        mono: ["'JetBrains Mono'", "monospace"],
+        mono: ["'DM Sans'", "sans-serif"],
         display: ["'Syne'", "sans-serif"],
       },
       colors: {

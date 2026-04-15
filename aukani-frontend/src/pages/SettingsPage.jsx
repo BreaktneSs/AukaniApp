@@ -8,6 +8,7 @@ import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 import { agentService } from "@/services/agent.service"
 import { confirm } from "@/components/ui/ConfirmDialog"
+import Checkbox from "@/components/ui/Checkbox"
 
 const TABS = ["Negocio", "Impresora", "Usuarios", "Categorías", "Métodos de pago"]
 
@@ -298,20 +299,15 @@ function PrinterTab() {
       )}
 
       {/* Toggle usar agente */}
-      <label className="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" checked={useAgent}
-          onChange={e => {
-            setUseAgent(e.target.checked)
-            saveAgentConfig({ useAgent: e.target.checked, printer: selectedPrinter })
-          }}
-          className="w-4 h-4 rounded" />
-        <div>
-          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Usar agente local</p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Si está desactivado, se abrirá una ventana del navegador para imprimir
-          </p>
-        </div>
-      </label>
+      <Checkbox
+        checked={useAgent}
+        onChange={e => {
+          setUseAgent(e.target.checked)
+          saveAgentConfig({ useAgent: e.target.checked, printer: selectedPrinter })
+        }}
+        label="Usar agente local"
+        sublabel="Si está desactivado, se abrirá una ventana del navegador para imprimir"
+      />
 
       {/* Descarga del agente */}
       <div className="card p-4 space-y-3" style={{ background: "var(--bg-primary)" }}>

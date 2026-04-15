@@ -271,6 +271,9 @@ function OpenShiftScreen({ onOpen, loading }) {
 }
 
 // ── Modal cierre de turno ─────────────────────────────────
+// Tipografía numérica: DM Sans + tabular-nums (sin JetBrains Mono que confunde 0/8)
+const NUM = { fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums" }
+
 function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
   const [rawClosing, setRawClosing] = useState("")
   const [notes, setNotes] = useState("")
@@ -294,65 +297,103 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
   const hours = Math.floor(duration / 60), mins = duration % 60
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose}>
-      <div className="card p-6 w-full max-w-md animate-slide-up overflow-y-auto max-h-[92vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-bold text-lg" style={{ color: "var(--text-primary)" }}>Cierre de turno</h2>
-          <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center"><X size={15} /></button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="card w-full max-w-md animate-slide-up overflow-y-auto max-h-[92vh]" onClick={e => e.stopPropagation()}>
 
-        {/* Resumen */}
-        <div className="rounded-lg p-4 mb-4 space-y-3" style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}>
-          <div className="flex justify-between items-center">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "var(--danger-light)" }}>
+              <LogOut size={17} style={{ color: "var(--danger)" }} />
+            </div>
             <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{shift?.user?.name}</p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Inicio: {shift?.openedAt ? new Date(shift.openedAt).toLocaleTimeString() : "—"}
-                {" · "}{hours > 0 ? `${hours}h ` : ""}{mins}min
+              <h2 className="font-display font-bold text-base leading-tight" style={{ color: "var(--text-primary)" }}>
+                Cierre de turno
+              </h2>
+              <p className="text-xs font-medium" style={{ color: "var(--info)" }}>
+                {shift?.user?.name}
+                {" · "}
+                {hours > 0 ? `${hours}h ` : ""}{mins}min
+                {" · desde "}
+                {shift?.openedAt ? new Date(shift.openedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Ventas totales</p>
-              <p className="font-mono font-bold" style={{ color: "var(--brand)" }}>{formatCOP(totalSales)}</p>
-            </div>
           </div>
+          <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center shrink-0">
+            <X size={15} />
+          </button>
+        </div>
 
-          <div className="border-t pt-3 space-y-1.5" style={{ borderColor: "var(--border)" }}>
-            <p className="text-xs font-medium mb-2" style={{ color: "var(--text-muted)" }}>Por método de pago</p>
-            {shift?.shiftPayments?.length > 0 ? shift.shiftPayments.map(p => (
-              <div key={p.id} className="flex justify-between text-sm">
-                <span style={{ color: "var(--text-secondary)" }}>{p.paymentMethod?.name}</span>
-                <span className="font-mono font-medium" style={{ color: "var(--text-primary)" }}>{formatCOP(p.total)}</span>
-              </div>
-            )) : <p className="text-xs" style={{ color: "var(--text-muted)" }}>Sin ventas registradas</p>}
-          </div>
+        {/* ── Ventas totales ── */}
+        <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)", background: "var(--brand-light)" }}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--brand-dark)" }}>
+            Total vendido
+          </p>
+          <p className="text-3xl font-bold leading-none" style={{ color: "var(--brand)", ...NUM }}>
+            {formatCOP(totalSales)}
+          </p>
+        </div>
 
-          <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Efectivo esperado</p>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Apertura {formatCOP(openingCash)} + ventas efectivo {formatCOP(cashSales)}
-                </p>
-              </div>
-              <p className="font-mono font-bold text-lg" style={{ color: "var(--brand)" }}>{formatCOP(expectedCash)}</p>
+        {/* ── Por método de pago ── */}
+        <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>
+            Por método de pago
+          </p>
+          {shift?.shiftPayments?.length > 0 ? (
+            <div className="space-y-2">
+              {shift.shiftPayments.map(p => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
+                    {p.paymentMethod?.name}
+                  </span>
+                  <span className="text-base font-bold" style={{ color: "var(--text-primary)", ...NUM }}>
+                    {formatCOP(p.total)}
+                  </span>
+                </div>
+              ))}
             </div>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Sin ventas registradas</p>
+          )}
+        </div>
+
+        {/* ── Efectivo esperado ── */}
+        <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>
+            Cuadre de efectivo
+          </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>Efectivo esperado</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <span style={{ color: "var(--text-secondary)" }}>{formatCOP(openingCash)}</span>
+                {" apertura + "}
+                <span style={{ color: "var(--text-secondary)" }}>{formatCOP(cashSales)}</span>
+                {" ventas"}
+              </p>
+            </div>
+            <p className="text-xl font-bold" style={{ color: "var(--brand)", ...NUM }}>
+              {formatCOP(expectedCash)}
+            </p>
           </div>
         </div>
 
-        <form onSubmit={e => { e.preventDefault(); onConfirm({ closingCash, notes }) }} className="space-y-3">
+        {/* ── Formulario ── */}
+        <form onSubmit={e => { e.preventDefault(); onConfirm({ closingCash, notes }) }} className="px-6 py-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+            <label className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--text-secondary)" }}>
               Efectivo contado en caja *
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm font-bold" style={{ color: "var(--text-muted)" }}>$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold" style={{ color: "var(--text-muted)", ...NUM }}>$</span>
               <input
                 type="text"
                 inputMode="numeric"
                 required
                 autoFocus
-                className="input pl-8 text-lg font-mono font-bold text-right pr-3"
+                className="input pl-8 text-xl font-bold text-right pr-3"
+                style={NUM}
                 placeholder="0"
                 value={displayClosing}
                 onChange={handleClosingChange}
@@ -361,13 +402,16 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
           </div>
 
           {difference !== null && (
-            <div className="flex items-center justify-between rounded-lg px-4 py-3 animate-fade-in"
-              style={{ background: Math.abs(difference) < 0.01 ? "var(--brand-light)" : difference > 0 ? "var(--brand-light)" : "var(--danger-light)" }}>
-              <span className="text-sm font-semibold" style={{ color: Math.abs(difference) < 0.01 ? "var(--brand)" : difference > 0 ? "var(--brand)" : "var(--danger)" }}>
-                {Math.abs(difference) < 0.01 ? "✅ Cuadra exacto" : difference > 0 ? "↑ Sobrante" : "↓ Faltante"}
+            <div className="flex items-center justify-between rounded-xl px-4 py-3 animate-fade-in"
+              style={{
+                background: Math.abs(difference) < 0.01 ? "var(--brand-light)" : difference > 0 ? "var(--brand-light)" : "var(--danger-light)",
+                border: `1.5px solid ${Math.abs(difference) < 0.01 ? "var(--brand)" : difference > 0 ? "var(--brand)" : "var(--danger)"}`,
+              }}>
+              <span className="text-sm font-bold" style={{ color: Math.abs(difference) < 0.01 ? "var(--brand)" : difference > 0 ? "var(--brand)" : "var(--danger)" }}>
+                {Math.abs(difference) < 0.01 ? "✓ Cuadra exacto" : difference > 0 ? "↑ Sobrante" : "↓ Faltante"}
               </span>
               {Math.abs(difference) >= 0.01 && (
-                <span className="font-mono font-bold" style={{ color: difference > 0 ? "var(--brand)" : "var(--danger)" }}>
+                <span className="text-lg font-bold" style={{ color: difference > 0 ? "var(--brand)" : "var(--danger)", ...NUM }}>
                   {formatCOP(Math.abs(difference))}
                 </span>
               )}
@@ -375,13 +419,19 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
           )}
 
           <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Notas</label>
-            <textarea className="input resize-none" rows={2} placeholder="Observaciones del turno..." value={notes} onChange={e => setNotes(e.target.value)} />
+            <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-secondary)" }}>
+              Notas
+            </label>
+            <textarea className="input resize-none" rows={2}
+              placeholder="Observaciones del turno..."
+              value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
-            <button type="submit" disabled={loading || rawClosing === ""} className="btn-md flex-1 text-white font-semibold" style={{ background: "var(--danger)" }}>
+            <button type="submit" disabled={loading || rawClosing === ""}
+              className="btn-md flex-1 text-white font-bold"
+              style={{ background: "var(--danger)" }}>
               {loading ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
               Cerrar turno
             </button>
