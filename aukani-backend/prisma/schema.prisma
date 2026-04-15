@@ -19,6 +19,7 @@ enum OrderStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+  PARTIAL_REFUND
 }
 
 enum MovementType {
@@ -169,11 +170,12 @@ model Order {
 }
 
 model OrderItem {
-  id        Int     @id @default(autoincrement())
-  orderId   Int
-  productId Int
-  quantity  Int
-  price     Decimal @db.Decimal(10, 2)
+  id           Int     @id @default(autoincrement())
+  orderId      Int
+  productId    Int
+  quantity     Int
+  price        Decimal @db.Decimal(10, 2)
+  refundedQty  Int     @default(0)
 
   order   Order   @relation(fields: [orderId], references: [id])
   product Product @relation(fields: [productId], references: [id])
@@ -299,6 +301,7 @@ enum AuditAction {
   PRODUCT_DELETE
   SALE_CREATE
   SALE_CANCEL
+  SALE_REFUND
   SHIFT_OPEN
   SHIFT_CLOSE
   SUBSHIFT_OPEN

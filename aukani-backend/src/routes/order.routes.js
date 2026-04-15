@@ -8,4 +8,5 @@ export async function orderRoutes(fastify) {
   fastify.get("/orders/summary/daily",      { preHandler: adminOrJefe }, orderController.getDailySummary)
   fastify.get("/orders/accounting",         { preHandler: adminOrJefe }, orderController.getAccountingReport)
   fastify.get("/orders/:id",               { preHandler: adminOrJefe }, orderController.getById)
+  fastify.patch("/orders/:id/refund",      { preHandler: adminOrJefe }, orderController.refund)
 }
