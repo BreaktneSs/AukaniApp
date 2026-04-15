@@ -87,6 +87,78 @@ export const orderService = {
     })
   },
 
+  // items: [{ orderItemId, quantity }]
+  async refund(orderId, userId, items) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: true } } },
+    })
+    if (!order) throw { statusCode: 404, message: "Venta no encontrada" }
+    if (order.status === "CANCELLED")      throw { statusCode: 409, message: "La venta está cancelada" }
+    if (order.status === "REFUNDED")       throw { statusCode: 409, message: "La venta ya fue devuelta completamente" }
+
+    // Validar que cada item exista en la orden y la cantidad sea válida
+    for (const r of items) {
+      const orderItem = order.items.find(i => i.id === r.orderItemId)
+      if (!orderItem) throw { statusCode: 400, message: `Artículo #${r.orderItemId} no pertenece a esta venta` }
+      const remaining = orderItem.quantity - orderItem.refundedQty
+      if (r.quantity <= 0 || r.quantity > remaining) {
+        throw { statusCode: 400, message: `Cantidad inválida para "${orderItem.product?.name}". Máximo a devolver: ${remaining}` }
+      }
+    }
+
+    const refundTotal = items.reduce((sum, r) => {
+      const orderItem = order.items.find(i => i.id === r.orderItemId)
+      return sum + Number(orderItem.price) * r.quantity
+    }, 0)
+
+    return prisma.$transaction(async (tx) => {
+      for (const r of items) {
+        const orderItem = order.items.find(i => i.id === r.orderItemId)
+
+        // Actualizar refundedQty en el item
+        await tx.orderItem.update({
+          where: { id: orderItem.id },
+          data: { refundedQty: { increment: r.quantity } },
+        })
+
+        if (orderItem.product?.type !== "SERVICE") {
+          await tx.product.update({
+            where: { id: orderItem.productId },
+            data: { stock: { increment: r.quantity } },
+          })
+          await tx.inventoryMovement.create({
+            data: {
+              productId: orderItem.productId,
+              userId,
+              type: "ENTRY",
+              quantity: r.quantity,
+              reason: `Devolución venta #${orderId}`,
+            },
+          })
+        }
+      }
+
+      // Calcular el estado tras aplicar esta devolución
+      // Leer los items actualizados para tener los refundedQty frescos
+      const updatedItems = await tx.orderItem.findMany({ where: { orderId } })
+      const isFullRefund = updatedItems.every(oi => oi.refundedQty >= oi.quantity)
+      const newStatus = isFullRefund ? "REFUNDED" : "PARTIAL_REFUND"
+
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: { status: newStatus },
+        include: {
+          items: { include: { product: { select: { id: true, name: true } } } },
+          payments: { include: { paymentMethod: true } },
+          user: { select: { id: true, name: true } },
+        },
+      })
+
+      return { order: updatedOrder, refundTotal, refundedItems: items }
+    })
+  },
+
   async getAll({ page = 1, limit = 20, from, to, userId, shiftId } = {}) {
     const skip = (page - 1) * limit
     const where = {}
