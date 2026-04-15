@@ -1,5 +1,15 @@
 import prisma from "../config/prisma.js"
 
+// Normaliza texto para extraer código de categoría: "Lácteos" → "LAC"
+function catCode(name) {
+  return name
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 3)
+    .padEnd(3, "X")
+}
+
 export const productService = {
   async getAll({ page = 1, limit = 200, search, categoryId, minPrice, maxPrice, lowStock, active = true } = {}) {
     const skip = (page - 1) * limit
@@ -55,9 +65,37 @@ export const productService = {
     return (await this.getAll({ search: query, limit: 50 })).products
   },
 
+  async generateSku(type, categoryId) {
+    const prefix = type === "SERVICE" ? "SVC" : "PRD"
+
+    let code = "GEN"
+    if (categoryId) {
+      const cat = await prisma.category.findUnique({ where: { id: Number(categoryId) } })
+      if (cat) code = catCode(cat.name)
+    }
+
+    const pattern = `${prefix}-${code}-`
+    const existing = await prisma.product.findMany({
+      where: { sku: { startsWith: pattern } },
+      select: { sku: true },
+    })
+
+    let maxSeq = 0
+    for (const p of existing) {
+      const n = parseInt(p.sku.slice(pattern.length), 10)
+      if (!isNaN(n) && n > maxSeq) maxSeq = n
+    }
+
+    return `${pattern}${String(maxSeq + 1).padStart(4, "0")}`
+  },
+
   async create(data) {
+    // Auto-generar SKU si no viene en el body
+    const sku = data.sku?.trim()
+      || await this.generateSku(data.type || "PHYSICAL", data.categoryId || null)
+
     return prisma.product.create({
-      data,
+      data: { ...data, sku },
       include: { category: { select: { id: true, name: true } } },
     })
   },

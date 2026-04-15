@@ -31,10 +31,10 @@ export default function App() {
             <Route path="/waiter"    element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><WaiterPage /></ProtectedRoute>} />
             <Route path="/dispatch"  element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><DispatchPage /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><InventoryPage /></ProtectedRoute>} />
-            <Route path="/sales"     element={<ProtectedRoute roles={["ADMIN","JEFE"]}><SalesPage /></ProtectedRoute>} />
+            <Route path="/sales"     element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><SalesPage /></ProtectedRoute>} />
             <Route path="/shifts"    element={<ProtectedRoute roles={["ADMIN","JEFE"]}><ShiftsPage /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute roles={["ADMIN","JEFE"]}><DashboardPage /></ProtectedRoute>} />
-            <Route path="/settings"  element={<ProtectedRoute roles={["ADMIN"]}><SettingsPage /></ProtectedRoute>} />
+            <Route path="/settings"  element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/audit"     element={<ProtectedRoute roles={["ADMIN"]}><AuditPage /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/pos" replace />} />

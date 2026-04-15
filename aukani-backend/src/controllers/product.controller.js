@@ -31,6 +31,12 @@ export const productController = {
     return reply.send(product)
   },
 
+  async generateSku(req, reply) {
+    const { type = "PHYSICAL", categoryId } = req.query
+    const sku = await productService.generateSku(type, categoryId ? Number(categoryId) : null)
+    return reply.send({ sku })
+  },
+
   async search(req, reply) {
     const { q } = req.query
     const result = await productService.getAll({ search: q || "", limit: 50 })

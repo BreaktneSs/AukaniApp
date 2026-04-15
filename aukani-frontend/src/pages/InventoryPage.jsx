@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { inventoryService } from "@/services/inventory.service"
 import { productsService } from "@/services/products.service"
@@ -9,7 +9,7 @@ import {
   Plus, Minus, Loader2, Package, X, ChevronRight,
   TrendingUp, ShoppingCart, AlertTriangle, Search,
   Edit2, Trash2, Upload, Camera, SlidersHorizontal,
-  ChevronDown, ChevronUp, Wrench
+  ChevronDown, ChevronUp, Wrench, RefreshCw
 } from "lucide-react"
 import Checkbox from "@/components/ui/Checkbox"
 import toast from "react-hot-toast"
@@ -100,6 +100,7 @@ function ImageUploader({ currentUrl, productId, onUploaded }) {
 
 // ── Modal crear/editar producto ───────────────────────────
 function ProductModal({ product, categories, onClose, onSave }) {
+  const isNew = !product
   const [form, setForm] = useState({
     name: product?.name || "", price: product?.price || "", cost: product?.cost || "",
     type: product?.type || "PHYSICAL",
@@ -107,7 +108,24 @@ function ProductModal({ product, categories, onClose, onSave }) {
     barcode: product?.barcode || "", sku: product?.sku || "", categoryId: product?.categoryId || "",
   })
   const [pendingImage, setPendingImage] = useState(null)
+  const [skuAuto, setSkuAuto] = useState(isNew && !product?.sku)
+  const [skuLoading, setSkuLoading] = useState(false)
   const isService = form.type === "SERVICE"
+
+  // Genera y aplica SKU desde el backend
+  const fetchSku = useCallback(async (type, categoryId) => {
+    setSkuLoading(true)
+    try {
+      const sku = await productsService.generateSku(type, categoryId || null)
+      setForm(f => ({ ...f, sku }))
+    } catch { /* silencioso */ }
+    finally { setSkuLoading(false) }
+  }, [])
+
+  // Auto-generar al abrir (nuevo producto) o cuando cambia tipo/categoría en modo auto
+  useEffect(() => {
+    if (isNew && skuAuto) fetchSku(form.type, form.categoryId)
+  }, [form.type, form.categoryId, skuAuto, isNew])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -171,18 +189,61 @@ function ProductModal({ product, categories, onClose, onSave }) {
             {field("Costo", "cost", "number", { min: 0, step: "1" })}
           </div>
           {!isService && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                {field("Stock inicial", "stock", "number", { min: 0 })}
-                {field("Stock mínimo", "minStock", "number", { min: 0 })}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {field("Código de barras", "barcode")}
-                {field("SKU", "sku")}
-              </div>
-            </>
+            <div className="grid grid-cols-2 gap-3">
+              {field("Stock inicial", "stock", "number", { min: 0 })}
+              {field("Stock mínimo", "minStock", "number", { min: 0 })}
+            </div>
           )}
-          {isService && <div>{field("SKU", "sku")}</div>}
+
+          {/* SKU — campo estandarizado con generación automática */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                SKU
+              </label>
+              {isNew && (
+                <div className="flex items-center gap-2">
+                  {skuAuto ? (
+                    <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                      style={{ background: "var(--brand-light)", color: "var(--brand)" }}>
+                      Auto
+                    </span>
+                  ) : (
+                    <button type="button"
+                      onClick={() => { setSkuAuto(true); fetchSku(form.type, form.categoryId) }}
+                      className="text-xs btn-ghost px-1.5 py-0.5 rounded"
+                      style={{ color: "var(--text-muted)" }}>
+                      Restaurar auto
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                className="input pr-9 font-mono text-sm tracking-wider"
+                placeholder="PRD-GEN-0001"
+                value={form.sku}
+                onChange={e => { setSkuAuto(false); setForm(f => ({ ...f, sku: e.target.value.toUpperCase() })) }}
+              />
+              {isNew && (
+                <button type="button"
+                  onClick={() => fetchSku(form.type, form.categoryId)}
+                  disabled={skuLoading}
+                  title="Regenerar SKU"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 btn-ghost w-6 h-6 rounded flex items-center justify-center"
+                  style={{ color: "var(--text-muted)" }}>
+                  <RefreshCw size={13} className={skuLoading ? "animate-spin" : ""} />
+                </button>
+              )}
+            </div>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              {isNew ? "Generado automáticamente · puedes editarlo o regenerarlo" : "Edita con cuidado — identifica el producto de forma única"}
+            </p>
+          </div>
+
+          {!isService && field("Código de barras", "barcode")}
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Categoría</label>
             <select className="input" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>

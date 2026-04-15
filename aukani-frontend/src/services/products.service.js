@@ -8,6 +8,9 @@ export const productsService = {
   update: (id, data) => api.put(`/products/${id}`, data).then(r => r.data),
   updateStock: (id, quantity) => api.patch(`/products/${id}/stock`, { quantity }).then(r => r.data),
   delete: (id) => api.delete(`/products/${id}`).then(r => r.data),
+  generateSku: (type, categoryId) =>
+    api.get("/products/sku/generate", { params: { type, categoryId: categoryId || undefined } })
+       .then(r => r.data.sku),
   uploadImage: (id, file) => {
     const form = new FormData()
     form.append("image", file)

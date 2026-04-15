@@ -181,12 +181,18 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
     queryFn: paymentMethodsService.getAll,
   })
 
+  // Inicializar con Efectivo al montar
+  useEffect(() => {
+    if (paymentMethods.length > 0 && payments.length === 0) {
+      const efectivo = paymentMethods.find(m => m.active && m.name === "Efectivo") || paymentMethods.find(m => m.active)
+      if (efectivo) setPayments([{ paymentMethodId: efectivo.id, amount: 0, rawAmount: "" }])
+    }
+  }, [paymentMethods])
+
   const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0)
   const cashMethod = paymentMethods.find(m => m.name === "Efectivo")
   const cashEntry = payments.find(p => p.paymentMethodId === cashMethod?.id)
   const cashPaid = cashEntry?.amount || 0
-
-  // Calcular cuánto va en efectivo neto y cuál es el vuelto
   const nonCashTotal = payments.filter(p => p.paymentMethodId !== cashMethod?.id).reduce((s, p) => s + (p.amount || 0), 0)
   const cashNet = Math.max(0, total - nonCashTotal)
   const change = cashPaid - cashNet
@@ -204,58 +210,90 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
     onError: e => toast.error(e.response?.data?.error || "Error al enviar pedido"),
   })
 
-  const setAmount = (methodId, digits) => {
-    const amount = Number(digits) || 0
-    setPayments(prev => {
-      const exists = prev.find(p => p.paymentMethodId === methodId)
-      if (exists) return prev.map(p => p.paymentMethodId === methodId ? { ...p, amount, rawAmount: digits } : p)
-      return [...prev, { paymentMethodId: methodId, amount, rawAmount: digits }]
-    })
-  }
-
   return (
-    <div className="space-y-3 animate-slide-up">
-      <div className="border-t pt-3 space-y-2.5" style={{ borderColor: "var(--border)" }}>
-        <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Pago del cliente</p>
-        {paymentMethods.filter(m => m.active).map(method => {
-          const p = payments.find(x => x.paymentMethodId === method.id)
-          const raw = p?.rawAmount || ""
-          const display = raw ? new Intl.NumberFormat("es-CO").format(Number(raw)) : ""
-          return (
-            <div key={method.id} className="flex items-center gap-2">
-              <label className="text-xs w-20 shrink-0 font-medium" style={{ color: "var(--text-secondary)" }}>{method.name}</label>
-              <div className="relative flex-1">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono" style={{ color: "var(--text-muted)" }}>$</span>
-                <input type="text" inputMode="numeric" className="input text-sm font-mono font-bold pl-6 text-right"
-                  placeholder="0" value={display}
-                  onChange={e => setAmount(method.id, e.target.value.replace(/\D/g, ""))} />
-              </div>
+    <div className="space-y-2 animate-slide-up border-t pt-3" style={{ borderColor: "var(--border)" }}>
+
+      {payments.map((row, idx) => {
+        const usedIds = payments.filter(p => p.paymentMethodId !== row.paymentMethodId).map(p => p.paymentMethodId)
+        const availableMethods = paymentMethods.filter(m => m.active && (m.id === row.paymentMethodId || !usedIds.includes(m.id)))
+        const displayAmt = row.rawAmount ? new Intl.NumberFormat("es-CO").format(Number(row.rawAmount)) : ""
+        return (
+          <div key={row.paymentMethodId} className="flex items-center gap-1.5">
+            <select
+              value={row.paymentMethodId}
+              onChange={e => {
+                const newId = Number(e.target.value)
+                setPayments(prev => prev.map(p => p.paymentMethodId === row.paymentMethodId
+                  ? { paymentMethodId: newId, amount: 0, rawAmount: "" }
+                  : p
+                ))
+              }}
+              className="input text-sm flex-1 min-w-0"
+            >
+              {availableMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <div className="relative flex-1">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-muted)" }}>$</span>
+              <input
+                type="text" inputMode="numeric" autoFocus={idx === 0}
+                className="input text-sm font-bold pl-6 text-right"
+                placeholder="0" value={displayAmt}
+                onChange={e => {
+                  const digits = e.target.value.replace(/\D/g, "")
+                  setPayments(prev => prev.map(p => p.paymentMethodId === row.paymentMethodId
+                    ? { ...p, amount: Number(digits) || 0, rawAmount: digits }
+                    : p
+                  ))
+                }}
+              />
             </div>
-          )
-        })}
-      </div>
+            {payments.length > 1 && (
+              <button
+                onClick={() => setPayments(prev => prev.filter(p => p.paymentMethodId !== row.paymentMethodId))}
+                className="w-9 h-9 rounded flex items-center justify-center shrink-0 btn-ghost"
+                style={{ color: "var(--danger)" }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        )
+      })}
+
+      {paymentMethods.filter(m => m.active && !payments.some(p => p.paymentMethodId === m.id)).length > 0 && (
+        <button
+          onClick={() => {
+            const available = paymentMethods.filter(m => m.active && !payments.some(p => p.paymentMethodId === m.id))
+            if (available.length > 0) setPayments(prev => [...prev, { paymentMethodId: available[0].id, amount: 0, rawAmount: "" }])
+          }}
+          className="w-full btn-sm flex items-center justify-center gap-1.5 rounded-lg"
+          style={{ border: "1.5px dashed var(--border)", color: "var(--text-muted)", background: "transparent" }}
+        >
+          <Plus size={13} /> Agregar método de pago
+        </button>
+      )}
 
       {totalPaid > 0 && (
         <div className="rounded-lg px-4 py-3 space-y-1.5 animate-fade-in"
           style={{ background: totalPaid >= total ? "var(--brand-light)" : "var(--danger-light)" }}>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--text-secondary)" }}>Total venta</span>
-            <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(total)}</span>
+            <span className="font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(total)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--text-secondary)" }}>Total recibido</span>
-            <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(totalPaid)}</span>
+            <span className="font-bold" style={{ color: "var(--text-primary)" }}>{formatCOP(totalPaid)}</span>
           </div>
           {change > 0 && (
             <div className="flex justify-between text-sm font-bold border-t pt-1.5" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
               <span style={{ color: "var(--brand)" }}>Vuelto en efectivo</span>
-              <span className="font-mono" style={{ color: "var(--brand)" }}>{formatCOP(change)}</span>
+              <span className="font-bold" style={{ color: "var(--brand)" }}>{formatCOP(change)}</span>
             </div>
           )}
           {totalPaid < total && (
             <div className="flex justify-between text-sm font-bold border-t pt-1.5" style={{ borderColor: "rgba(0,0,0,0.1)" }}>
               <span style={{ color: "var(--danger)" }}>Falta</span>
-              <span className="font-mono" style={{ color: "var(--danger)" }}>{formatCOP(total - totalPaid)}</span>
+              <span className="font-bold" style={{ color: "var(--danger)" }}>{formatCOP(total - totalPaid)}</span>
             </div>
           )}
         </div>
