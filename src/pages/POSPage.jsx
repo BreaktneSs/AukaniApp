@@ -175,11 +175,6 @@ function OpenShiftScreen({ onOpen, loading }) {
                 onChange={handleChange}
               />
             </div>
-            {numericValue > 0 && (
-              <p className="text-right text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                {formatCOP(numericValue)}
-              </p>
-            )}
             <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Cuenta el efectivo antes de empezar</p>
           </div>
           <button type="submit" disabled={loading || numericValue === 0} className="btn-primary btn-lg w-full">

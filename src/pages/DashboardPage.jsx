@@ -52,8 +52,8 @@ function LineChart({ data }) {
   const [active, setActive] = useState(null)
   const svgRef = useRef(null)
 
-  const W = 500, H = 120
-  const PAD = { top: 16, right: 16, bottom: 28, left: 8 }
+  const W = 600, H = 135
+  const PAD = { top: 16, right: 20, bottom: 28, left: 52 }
   const chartW = W - PAD.left - PAD.right
   const chartH = H - PAD.top - PAD.bottom
 
@@ -93,15 +93,17 @@ function LineChart({ data }) {
     ? `${linePath} L ${pts[pts.length - 1].x} ${PAD.top + chartH} L ${pts[0].x} ${PAD.top + chartH} Z`
     : ""
 
-  // Hover: encontrar el punto más cercano al mouse en X
+  // Hover: convertir coordenadas de pantalla → espacio SVG con getScreenCTM
   const handleMouseMove = (e) => {
     const svg = svgRef.current
     if (!svg) return
-    const rect = svg.getBoundingClientRect()
-    const mouseX = ((e.clientX - rect.left) / rect.width) * W
+    const pt = svg.createSVGPoint()
+    pt.x = e.clientX
+    pt.y = e.clientY
+    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse())
     let closest = null, minDist = Infinity
     pts.forEach((p, i) => {
-      const dist = Math.abs(p.x - mouseX)
+      const dist = Math.abs(p.x - svgPt.x)
       if (dist < minDist) { minDist = dist; closest = i }
     })
     setActive(closest)
@@ -110,17 +112,16 @@ function LineChart({ data }) {
   const ap = active !== null ? pts[active] : null
 
   // Tooltip: no salirse del SVG
-  const tooltipW = 120, tooltipH = 52
+  const tooltipW = 148, tooltipH = 62
   const tooltipX = ap ? Math.min(Math.max(ap.x - tooltipW / 2, PAD.left), W - PAD.right - tooltipW) : 0
-  const tooltipY = ap ? (ap.y - tooltipH - 10 < PAD.top ? ap.y + 14 : ap.y - tooltipH - 10) : 0
+  const tooltipY = ap ? (ap.y - tooltipH - 12 < PAD.top ? ap.y + 14 : ap.y - tooltipH - 12) : 0
 
   return (
-    <div className="w-full select-none">
+    <div className="w-full select-none" style={{ position: "relative", paddingBottom: `${(H / W) * 100}%` }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        style={{ height: 140, cursor: "crosshair" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", cursor: "crosshair" }}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setActive(null)}
       >
@@ -141,8 +142,8 @@ function LineChart({ data }) {
           return (
             <g key={pct}>
               <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y}
-                stroke="var(--border)" strokeWidth="0.5" strokeDasharray="4,4" />
-              <text x={PAD.left} y={y - 2} fontSize="7" fill="var(--text-muted)" textAnchor="start">
+                stroke="var(--border)" strokeWidth="0.6" strokeDasharray="5,5" />
+              <text x={PAD.left - 6} y={y + 3} fontSize="9" fill="var(--text-muted)" textAnchor="end">
                 {fmt(maxRevenue * pct)}
               </text>
             </g>
@@ -158,11 +159,11 @@ function LineChart({ data }) {
             strokeLinejoin="round" strokeLinecap="round" />
         )}
 
-        {/* Puntos siempre visibles (pequeños) */}
+        {/* Puntos siempre visibles */}
         {pts.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={p.revenue > 0 ? 2 : 1.5}
+          <circle key={i} cx={p.x} cy={p.y} r={p.revenue > 0 ? 3 : 2}
             fill={p.revenue > 0 ? "var(--brand)" : "var(--border)"}
-            stroke="var(--bg-secondary)" strokeWidth="1" />
+            stroke="var(--bg-secondary)" strokeWidth="1.5" />
         ))}
 
         {/* Línea vertical + punto activo */}
@@ -170,23 +171,23 @@ function LineChart({ data }) {
           <g>
             <line x1={ap.x} y1={PAD.top} x2={ap.x} y2={PAD.top + chartH}
               stroke="var(--brand)" strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />
-            <circle cx={ap.x} cy={ap.y} r="5"
-              fill="var(--brand)" stroke="var(--bg-secondary)" strokeWidth="2"
+            <circle cx={ap.x} cy={ap.y} r="7"
+              fill="var(--brand)" stroke="var(--bg-secondary)" strokeWidth="2.5"
               filter="url(#glow)" />
 
             {/* Tooltip */}
             <rect x={tooltipX} y={tooltipY} width={tooltipW} height={tooltipH}
-              rx="6" fill="var(--bg-secondary)"
-              stroke="var(--brand)" strokeWidth="1" opacity="0.97" />
-            <text x={tooltipX + 10} y={tooltipY + 14} fontSize="8"
+              rx="8" fill="var(--bg-secondary)"
+              stroke="var(--brand)" strokeWidth="1.2" opacity="0.98" />
+            <text x={tooltipX + 12} y={tooltipY + 17} fontSize="10"
               fill="var(--text-muted)" fontWeight="500">
               {formatFull(ap.date)}
             </text>
-            <text x={tooltipX + 10} y={tooltipY + 28} fontSize="11"
+            <text x={tooltipX + 12} y={tooltipY + 36} fontSize="14"
               fill="var(--brand)" fontWeight="bold" fontFamily="monospace">
               {fmt(ap.revenue)}
             </text>
-            <text x={tooltipX + 10} y={tooltipY + 42} fontSize="8" fill="var(--text-muted)">
+            <text x={tooltipX + 12} y={tooltipY + 52} fontSize="10" fill="var(--text-muted)">
               {ap.orders} {ap.orders === 1 ? "venta" : "ventas"}
             </text>
           </g>
@@ -197,8 +198,8 @@ function LineChart({ data }) {
           const skip = n > 14 && i % 3 !== 0
           if (skip) return null
           return (
-            <text key={i} x={p.x} y={H - 4} textAnchor="middle"
-              fontSize="7.5" fill={active === i ? "var(--brand)" : "var(--text-muted)"}
+            <text key={i} x={p.x} y={H - 6} textAnchor="middle"
+              fontSize="9" fill={active === i ? "var(--brand)" : "var(--text-muted)"}
               fontWeight={active === i ? "700" : "400"}>
               {formatLabel(p.date)}
             </text>
@@ -352,11 +353,8 @@ function AccountingSection() {
             ))}
           </div>
 
-          {/* Gráfico + Métodos de pago */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-            {/* Tendencia diaria */}
-            <div className="card p-5 space-y-4">
+          {/* Tendencia diaria — ancho completo */}
+          <div className="card p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Tendencia de ventas</h3>
                 <div className="flex items-center gap-1 text-xs font-medium" style={{ color: "var(--brand)" }}>
@@ -373,7 +371,6 @@ function AccountingSection() {
               ) : (
                 <>
                   <LineChart data={trend} />
-                  {/* Mini resumen debajo del gráfico */}
                   <div className="grid grid-cols-3 gap-2 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
                     {(() => {
                       const best  = trend.reduce((a, b) => b.revenue > a.revenue ? b : a, trend[0])
@@ -394,34 +391,34 @@ function AccountingSection() {
                   </div>
                 </>
               )}
+          </div>
+
+          {/* Métodos de pago */}
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Por método de pago</h3>
+              <Percent size={14} style={{ color: "var(--text-muted)" }} />
             </div>
 
-            {/* Métodos de pago */}
-            <div className="card p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Por método de pago</h3>
-                <Percent size={14} style={{ color: "var(--text-muted)" }} />
+            {pmts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                <CreditCard size={24} style={{ color: "var(--text-muted)" }} />
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>Sin pagos registrados</p>
               </div>
-
-              {pmts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 gap-2">
-                  <CreditCard size={24} style={{ color: "var(--text-muted)" }} />
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>Sin pagos registrados</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                {pmts.map((p, i) => (
+                  <PaymentBar key={p.name} {...p} color={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
+                ))}
+                <div className="sm:col-span-2 lg:col-span-3 pt-2 border-t flex items-center justify-between"
+                  style={{ borderColor: "var(--border)" }}>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Total recaudado</span>
+                  <span className="font-mono font-bold text-sm" style={{ color: "var(--brand)" }}>
+                    {formatCOP(pmts.reduce((s, p) => s + p.amount, 0))}
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {pmts.map((p, i) => (
-                    <PaymentBar key={p.name} {...p} color={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
-                  ))}
-                  <div className="pt-2 border-t flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
-                    <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Total recaudado</span>
-                    <span className="font-mono font-bold text-sm" style={{ color: "var(--brand)" }}>
-                      {formatCOP(pmts.reduce((s, p) => s + p.amount, 0))}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Top productos */}

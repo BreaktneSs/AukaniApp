@@ -13,7 +13,7 @@ const nav = [
   { to: "/waiter",    icon: Smartphone,      label: "Caja remota",   roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/dispatch",  icon: Bell,            label: "Despachos",     roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/inventory", icon: Boxes,           label: "Inventario",    roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/sales",     icon: ClipboardList,   label: "Ventas",        roles: ["ADMIN","JEFE"] },
+  { to: "/sales",     icon: ClipboardList,   label: "Ventas/Devoluciones",        roles: ["ADMIN","JEFE"] },
   { to: "/shifts",    icon: Landmark,        label: "Control caja",  roles: ["ADMIN","JEFE"] },
   { to: "/dashboard", icon: BarChart3,       label: "Dashboard",     roles: ["ADMIN","JEFE"] },
   { to: "/settings",  icon: Settings,        label: "Config.",       roles: ["ADMIN"] },
