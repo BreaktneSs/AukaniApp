@@ -617,6 +617,7 @@ export default function POSPage() {
                               return [...prev, updated]
                             })
                           }}
+                          onKeyDown={e => { if (e.key === "Enter") handleSell() }}
                         />
                       </div>
                     </div>

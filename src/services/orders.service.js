@@ -6,4 +6,5 @@ export const ordersService = {
   cancel: (id) => api.patch(`/orders/${id}/cancel`).then(r => r.data),
   getDailySummary: () => api.get("/orders/summary/daily").then(r => r.data),
   getAccounting: (params) => api.get("/orders/accounting", { params }).then(r => r.data),
+  refund: (id, items) => api.patch(`/orders/${id}/refund`, { items }).then(r => r.data),
 }
