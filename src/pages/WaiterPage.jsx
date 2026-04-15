@@ -273,15 +273,9 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
 }
 
 // ── Panel enviar a cuenta ─────────────────────────────────
-function SendToAccountPanel({ items, subShiftId, parentShiftId, onSent, onCancel }) {
+function SendToAccountPanel({ items, accounts, isLoadingAccounts, subShiftId, onSent, onCancel }) {
   const [selectedAccountId, setSelectedAccountId] = useState(null)
-
-  const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ["accounts-shift", parentShiftId],
-    queryFn: () => accountsService.getByShift(parentShiftId),
-    enabled: !!parentShiftId,
-    refetchInterval: 10_000,
-  })
+  const isLoading = isLoadingAccounts
 
   const { mutate: send, isPending } = useMutation({
     mutationFn: (accId) => dispatchService.createDispatch({
@@ -375,6 +369,15 @@ export default function WaiterPage() {
       toast.success("Turno cerrado")
     },
     onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  // Cuentas abiertas de la caja principal (poll frecuente para reflejar cierres)
+  const { data: openAccounts = [], isLoading: accountsLoading } = useQuery({
+    queryKey: ["accounts-shift", subShift?.parentShiftId],
+    queryFn: () => accountsService.getByShift(subShift.parentShiftId),
+    enabled: !!subShift?.parentShiftId,
+    refetchInterval: 5_000,
+    staleTime: 0,
   })
 
   // Categorías
@@ -553,10 +556,12 @@ export default function WaiterPage() {
                   className="btn-primary btn-md flex-1">
                   <Send size={15} /> Cobrar
                 </button>
-                <button onClick={() => setShowAccountSend(true)} disabled={cart.length === 0}
+                <button onClick={() => setShowAccountSend(true)}
+                  disabled={cart.length === 0 || openAccounts.length === 0}
+                  title={openAccounts.length === 0 ? "No hay cuentas abiertas" : undefined}
                   className="btn-md flex-1 text-white font-semibold"
-                  style={{ background: "var(--info)" }}>
-                  <User size={15} /> A cuenta
+                  style={{ background: openAccounts.length > 0 ? "var(--info)" : "var(--bg-tertiary)", color: openAccounts.length > 0 ? "white" : "var(--text-muted)" }}>
+                  <User size={15} /> A cuenta {openAccounts.length > 0 && <span className="text-xs opacity-75">({openAccounts.length})</span>}
                 </button>
               </div>
             ) : showSend ? (
@@ -570,8 +575,9 @@ export default function WaiterPage() {
             ) : (
               <SendToAccountPanel
                 items={cart}
+                accounts={openAccounts}
+                isLoadingAccounts={accountsLoading}
                 subShiftId={subShift.id}
-                parentShiftId={subShift.parentShiftId}
                 onSent={() => { setCart([]); setShowAccountSend(false) }}
                 onCancel={() => setShowAccountSend(false)}
               />

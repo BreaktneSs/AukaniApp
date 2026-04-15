@@ -587,6 +587,15 @@ export default function POSPage() {
     },
   })
 
+  // Cerrar cuenta (pestaña de cuenta sin liquidar)
+  const closeAccountMut = useMutation({
+    mutationFn: (backendId) => accountsService.close(backendId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error al cerrar cuenta"),
+  })
+
   // Venta
   const { mutate: createSale, isPending: selling } = useMutation({
     mutationFn: ordersService.createSale,
@@ -896,7 +905,13 @@ export default function POSPage() {
       {confirmCloseAccount && (
         <CloseAccountWarningModal
           account={sales.find(s => s.id === confirmCloseAccount)}
-          onConfirm={() => { closeSale(confirmCloseAccount); setShowPayment(false); setConfirmCloseAccount(null) }}
+          onConfirm={() => {
+            const sale = sales.find(s => s.id === confirmCloseAccount)
+            if (sale?.backendId) closeAccountMut.mutate(sale.backendId)
+            closeSale(confirmCloseAccount)
+            setShowPayment(false)
+            setConfirmCloseAccount(null)
+          }}
           onClose={() => setConfirmCloseAccount(null)}
         />
       )}
