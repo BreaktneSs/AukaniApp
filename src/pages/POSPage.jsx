@@ -9,6 +9,8 @@ import { shiftsService } from "@/services/shifts.service"
 import { dispatchService } from "@/services/dispatch.service"
 import { accountsService } from "@/services/accounts.service"
 import { paymentMethodsService, categoriesService } from "@/services/catalog.service"
+import { useUiStore } from "@/store/ui.store"
+import NumPad from "@/components/ui/NumPad"
 import {
   Search, X, Plus, Minus, Trash2, ShoppingCart,
   CreditCard, Banknote, Loader2, Package,
@@ -63,7 +65,16 @@ function ProductCard({ product, onAdd }) {
 }
 
 // ── CartItem ──────────────────────────────────────────────
-function CartItem({ item, onUpdate, onRemove }) {
+function CartItem({ item, onUpdate, onRemove, onEditQty }) {
+  const [raw, setRaw] = useState(String(item.quantity))
+  useEffect(() => { setRaw(String(item.quantity)) }, [item.quantity])
+
+  const commit = () => {
+    const val = parseInt(raw, 10)
+    if (val > 0) onUpdate(item.id, val)
+    else setRaw(String(item.quantity))
+  }
+
   return (
     <div className="flex items-center gap-2 py-2.5 border-b animate-fade-in" style={{ borderColor: "var(--border)" }}>
       <div className="flex-1 min-w-0">
@@ -72,7 +83,32 @@ function CartItem({ item, onUpdate, onRemove }) {
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button onClick={() => onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
-        <span className="w-7 text-center text-sm font-mono font-bold" style={{ color: "var(--text-primary)" }}>{item.quantity}</span>
+        {onEditQty ? (
+          <span
+            className="w-8 text-center text-sm font-mono font-bold cursor-pointer rounded px-1 py-0.5 transition-colors active:scale-95"
+            style={{ color: "var(--brand)", background: "var(--brand-light)" }}
+            onClick={() => onEditQty(item.id, item.quantity, item.name)}
+          >{item.quantity}</span>
+        ) : (
+          <input
+            type="text" inputMode="numeric"
+            value={raw}
+            onChange={e => setRaw(e.target.value.replace(/\D/g, ""))}
+            onBlur={commit}
+            onKeyDown={e => e.key === "Enter" && e.currentTarget.blur()}
+            className="font-mono font-bold text-sm text-center rounded-md"
+            style={{
+              width: "2.25rem", height: "1.75rem",
+              background: "var(--bg-tertiary)",
+              border: "1.5px solid var(--border)",
+              color: "var(--text-primary)",
+              outline: "none",
+              transition: "border-color 0.15s",
+            }}
+            onFocus={e => { e.target.style.borderColor = "var(--brand)"; e.target.select() }}
+            onBlurCapture={e => { e.target.style.borderColor = "var(--border)" }}
+          />
+        )}
         <button onClick={() => onUpdate(item.id, item.quantity + 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Plus size={11} /></button>
       </div>
       <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
@@ -449,8 +485,10 @@ export default function POSPage() {
   const [showPayment, setShowPayment] = useState(false)
   const [showCloseShift, setShowCloseShift] = useState(false)
   const [showNewAccount, setShowNewAccount] = useState(false)
-  const [confirmCloseAccount, setConfirmCloseAccount] = useState(null) // sale id
+  const [confirmCloseAccount, setConfirmCloseAccount] = useState(null)
   const [payments, setPayments] = useState([])
+  const [numPad, setNumPad] = useState(null) // { id, value, label }
+  const { touchMode } = useUiStore()
   const searchRef = useRef(null)
   const qc = useQueryClient()
 
@@ -802,7 +840,11 @@ export default function POSPage() {
                     <div className="flex justify-end py-1">
                       <button onClick={clearActive} className="text-xs btn-ghost px-2 py-0.5 rounded" style={{ color: "var(--danger)" }}>Limpiar</button>
                     </div>
-                    {items.map(item => <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem} />)}
+                    {items.map(item => (
+                      <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem}
+                        onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
+                      />
+                    ))}
                   </>
                 )}
                 {remoteItems.length > 0 && (
@@ -979,6 +1021,15 @@ export default function POSPage() {
             setConfirmCloseAccount(null)
           }}
           onClose={() => setConfirmCloseAccount(null)}
+        />
+      )}
+
+      {numPad && (
+        <NumPad
+          initialValue={numPad.value}
+          label={numPad.label}
+          onConfirm={(val) => { updateQuantity(numPad.id, val); setNumPad(null) }}
+          onClose={() => setNumPad(null)}
         />
       )}
     </div>

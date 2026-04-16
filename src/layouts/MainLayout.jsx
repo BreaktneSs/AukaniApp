@@ -89,12 +89,6 @@ export default function MainLayout() {
               <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{user?.role}</p>
             </div>
           </div>
-          <button onClick={toggle} title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-md hover:opacity-80"
-            style={{ color: "var(--text-secondary)" }}>
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            <span className="text-sm">{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
-          </button>
           <button onClick={handleLogout} title="Cerrar sesión"
             className="w-full flex items-center gap-3 px-2.5 py-2 rounded-md hover:opacity-80"
             style={{ color: "var(--danger)" }}>
@@ -118,7 +112,12 @@ export default function MainLayout() {
             style={{ background: "var(--brand)" }}>
             {user?.name?.[0]?.toUpperCase()}
           </div>
-          <span className="font-display font-bold text-sm truncate" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
+          <span className="font-display font-bold text-sm truncate flex-1" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
+          <button onClick={toggle} title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+            className="w-8 h-8 rounded-md flex items-center justify-center btn-ghost shrink-0"
+            style={{ color: "var(--text-muted)" }}>
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </header>
 
         <main className="flex-1 overflow-auto"><Outlet /></main>
