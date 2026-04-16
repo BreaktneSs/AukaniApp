@@ -11,7 +11,9 @@ export const dispatchService = {
   // Pedidos
   createDispatch: (data) => api.post("/dispatches", data).then(r => r.data),
   getPendingDispatches: (shiftId) => api.get(`/dispatches/pending/${shiftId}`).then(r => r.data),
+  getDispatchedOrders: (shiftId) => api.get(`/dispatches/dispatched/${shiftId}`).then(r => r.data),
   getDispatchHistory: (shiftId) => api.get(`/dispatches/history/${shiftId}`).then(r => r.data),
   confirmDispatch: (id) => api.patch(`/dispatches/${id}/confirm`).then(r => r.data),
   cancelDispatch: (id) => api.patch(`/dispatches/${id}/cancel`).then(r => r.data),
+  deliverDispatch: (id) => api.patch(`/dispatches/${id}/deliver`).then(r => r.data),
 }

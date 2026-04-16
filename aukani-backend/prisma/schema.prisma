@@ -224,7 +224,8 @@ enum SubShiftStatus {
 
 enum DispatchStatus {
   PENDING    // Mesero envió, cajero no ha visto
-  DISPATCHED // Cajero confirmó despacho
+  DISPATCHED // Cajero confirmó, en camino al cliente
+  DELIVERED  // Entregado al cliente
   CANCELLED  // Cancelado
 }
 
@@ -260,6 +261,7 @@ model DispatchOrder {
   notes        String?
   createdAt    DateTime       @default(now())
   dispatchedAt DateTime?
+  deliveredAt  DateTime?
 
   accountId    Int?
   account      Account?       @relation(fields: [accountId], references: [id])

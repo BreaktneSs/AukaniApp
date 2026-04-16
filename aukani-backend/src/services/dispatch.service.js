@@ -302,6 +302,34 @@ export const dispatchService = {
     })
   },
 
+  // Pedidos despachados (confirmados) pero aún no entregados
+  async getDispatchedOrders(parentShiftId) {
+    return prisma.dispatchOrder.findMany({
+      where: {
+        status: "DISPATCHED",
+        subShift: { parentShiftId },
+      },
+      orderBy: { dispatchedAt: "asc" },
+      include: {
+        items: { include: { product: { select: { id: true, name: true, imageUrl: true } } } },
+        subShift: { include: { user: { select: { id: true, name: true } } } },
+        account: { select: { id: true, name: true } },
+      },
+    })
+  },
+
+  // Marcar como entregado
+  async deliverDispatch(dispatchId) {
+    const dispatch = await prisma.dispatchOrder.findUnique({ where: { id: dispatchId } })
+    if (!dispatch) throw { statusCode: 404, message: "Pedido no encontrado" }
+    if (dispatch.status !== "DISPATCHED") throw { statusCode: 409, message: "El pedido no está en estado despachado" }
+
+    return prisma.dispatchOrder.update({
+      where: { id: dispatchId },
+      data: { status: "DELIVERED", deliveredAt: new Date() },
+    })
+  },
+
   // Historial de despachos de una caja
   async getDispatchHistory(parentShiftId, { limit = 30 } = {}) {
     return prisma.dispatchOrder.findMany({

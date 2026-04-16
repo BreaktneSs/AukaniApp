@@ -15,8 +15,10 @@ export async function dispatchRoutes(fastify) {
 
   // Pedidos de despacho
   fastify.post("/dispatches",               { preHandler: allRoles }, dispatchController.createDispatch)
-  fastify.get("/dispatches/pending/:shiftId",  { preHandler: allRoles }, dispatchController.getPendingDispatches)
-  fastify.get("/dispatches/history/:shiftId",  { preHandler: allRoles }, dispatchController.getDispatchHistory)
-  fastify.patch("/dispatches/:id/confirm",  { preHandler: allRoles }, dispatchController.confirmDispatch)
-  fastify.patch("/dispatches/:id/cancel",   { preHandler: allRoles }, dispatchController.cancelDispatch)
+  fastify.get("/dispatches/pending/:shiftId",    { preHandler: allRoles }, dispatchController.getPendingDispatches)
+  fastify.get("/dispatches/dispatched/:shiftId", { preHandler: allRoles }, dispatchController.getDispatchedOrders)
+  fastify.get("/dispatches/history/:shiftId",    { preHandler: allRoles }, dispatchController.getDispatchHistory)
+  fastify.patch("/dispatches/:id/confirm",   { preHandler: allRoles }, dispatchController.confirmDispatch)
+  fastify.patch("/dispatches/:id/cancel",    { preHandler: allRoles }, dispatchController.cancelDispatch)
+  fastify.patch("/dispatches/:id/deliver",   { preHandler: allRoles }, dispatchController.deliverDispatch)
 }

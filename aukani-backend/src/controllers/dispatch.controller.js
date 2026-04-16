@@ -64,6 +64,24 @@ export const dispatchController = {
     return reply.send(dispatches)
   },
 
+  async getDispatchedOrders(req, reply) {
+    const { shiftId } = req.params
+    const dispatches = await dispatchService.getDispatchedOrders(Number(shiftId))
+    return reply.send(dispatches)
+  },
+
+  async deliverDispatch(req, reply) {
+    const result = await dispatchService.deliverDispatch(Number(req.params.id))
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "DISPATCH_DELIVER", entity: "DISPATCH", entityId: result.id,
+      entityLabel: `Despacho #${result.id}`,
+      newValues: { status: "DELIVERED" },
+      ip: ip(req),
+    })
+    return reply.send(result)
+  },
+
   async getDispatchHistory(req, reply) {
     const { shiftId } = req.params
     const history = await dispatchService.getDispatchHistory(Number(shiftId))
