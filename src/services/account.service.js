@@ -56,6 +56,22 @@ export const accountService = {
     }
   },
 
+  async removeItem(accountId, itemId) {
+    const item = await prisma.accountItem.findUnique({ where: { id: itemId } })
+    if (!item || item.accountId !== accountId) throw { statusCode: 404, message: "Item no encontrado en la cuenta" }
+
+    // Restaurar stock para productos físicos
+    const product = await prisma.product.findUnique({ where: { id: item.productId } })
+    if (product && product.type !== "SERVICE") {
+      await prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: item.quantity } },
+      })
+    }
+
+    return prisma.accountItem.delete({ where: { id: item.id } })
+  },
+
   async close(id, tx = prisma) {
     return tx.account.update({
       where: { id },

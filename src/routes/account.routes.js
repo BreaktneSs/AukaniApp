@@ -5,4 +5,5 @@ export async function accountRoutes(fastify) {
   fastify.post("/accounts",                    { preHandler: allRoles }, accountController.create)
   fastify.get("/accounts/shift/:shiftId",      { preHandler: allRoles }, accountController.getByShift)
   fastify.patch("/accounts/:id/close",         { preHandler: allRoles }, accountController.close)
+  fastify.delete("/accounts/:id/items/:itemId",{ preHandler: allRoles }, accountController.removeItem)
 }
