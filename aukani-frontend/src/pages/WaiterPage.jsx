@@ -5,6 +5,8 @@ import { accountsService } from "@/services/accounts.service"
 import { productsService } from "@/services/products.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
+import { useUiStore } from "@/store/ui.store"
+import NumPad from "@/components/ui/NumPad"
 import { formatCOP, formatNumber } from "@/utils/currency"
 import {
   Search, X, Plus, Minus, Trash2, Send, LogIn, LogOut,
@@ -150,7 +152,16 @@ function ProductCard({ product, onAdd }) {
 }
 
 // ── Item del carrito ──────────────────────────────────────
-function CartItem({ item, onUpdate, onRemove }) {
+function CartItem({ item, onUpdate, onRemove, onEditQty }) {
+  const [raw, setRaw] = useState(String(item.quantity))
+  useEffect(() => { setRaw(String(item.quantity)) }, [item.quantity])
+
+  const commit = () => {
+    const val = parseInt(raw, 10)
+    if (val > 0) onUpdate(item.id, val)
+    else setRaw(String(item.quantity))
+  }
+
   return (
     <div className="flex items-center gap-2 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
       <div className="flex-1 min-w-0">
@@ -159,7 +170,32 @@ function CartItem({ item, onUpdate, onRemove }) {
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button onClick={() => onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
-        <span className="w-7 text-center text-sm font-mono font-bold" style={{ color: "var(--text-primary)" }}>{item.quantity}</span>
+        {onEditQty ? (
+          <span
+            className="w-8 text-center text-sm font-mono font-bold cursor-pointer rounded px-1 py-0.5 transition-colors active:scale-95"
+            style={{ color: "var(--brand)", background: "var(--brand-light)" }}
+            onClick={() => onEditQty(item.id, item.quantity, item.name)}
+          >{item.quantity}</span>
+        ) : (
+          <input
+            type="text" inputMode="numeric"
+            value={raw}
+            onChange={e => setRaw(e.target.value.replace(/\D/g, ""))}
+            onBlur={commit}
+            onKeyDown={e => e.key === "Enter" && e.currentTarget.blur()}
+            className="font-mono font-bold text-sm text-center rounded-md"
+            style={{
+              width: "2.25rem", height: "1.75rem",
+              background: "var(--bg-tertiary)",
+              border: "1.5px solid var(--border)",
+              color: "var(--text-primary)",
+              outline: "none",
+              transition: "border-color 0.15s",
+            }}
+            onFocus={e => { e.target.style.borderColor = "var(--brand)"; e.target.select() }}
+            onBlurCapture={e => { e.target.style.borderColor = "var(--border)" }}
+          />
+        )}
         <button onClick={() => onUpdate(item.id, item.quantity + 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Plus size={11} /></button>
       </div>
       <p className="font-mono text-sm font-bold w-20 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
@@ -450,8 +486,10 @@ export default function WaiterPage() {
   const [cart, setCart] = useState([])
   const [showSend, setShowSend] = useState(false)
   const [showAccountSend, setShowAccountSend] = useState(false)
+  const [numPad, setNumPad] = useState(null)
   const searchRef = useRef(null)
   const qc = useQueryClient()
+  const { touchMode } = useUiStore()
 
   // Sub-turno actual
   const { data: subShift, isLoading: subLoading } = useQuery({
@@ -647,7 +685,11 @@ export default function WaiterPage() {
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>Agrega productos al pedido</p>
               </div>
             ) : (
-              cart.map(item => <CartItem key={item.id} item={item} onUpdate={updateQty} onRemove={removeItem} />)
+              cart.map(item => (
+                <CartItem key={item.id} item={item} onUpdate={updateQty} onRemove={removeItem}
+                  onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
+                />
+              ))
             )}
           </div>
 
@@ -694,6 +736,15 @@ export default function WaiterPage() {
           </div>
         </div>
       </div>
+
+      {numPad && (
+        <NumPad
+          initialValue={numPad.value}
+          label={numPad.label}
+          onConfirm={(val) => { updateQty(numPad.id, val); setNumPad(null) }}
+          onClose={() => setNumPad(null)}
+        />
+      )}
     </div>
   )
 }

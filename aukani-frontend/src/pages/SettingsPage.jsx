@@ -3,20 +3,94 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { usersService } from "@/services/users.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
-import { Plus, Loader2, CheckCircle, XCircle } from "lucide-react"
+import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 import { agentService } from "@/services/agent.service"
 import { confirm } from "@/components/ui/ConfirmDialog"
 import Checkbox from "@/components/ui/Checkbox"
+import { useThemeStore } from "@/store/theme.store"
+import { useUiStore } from "@/store/ui.store"
 
 const ALL_TABS = [
+  { name: "General",         roles: ["ADMIN", "JEFE", "VENDEDOR"] },
   { name: "Negocio",         roles: ["ADMIN", "JEFE"] },
   { name: "Impresora",       roles: ["ADMIN", "JEFE", "VENDEDOR"] },
   { name: "Usuarios",        roles: ["ADMIN"] },
   { name: "Categorías",      roles: ["ADMIN", "JEFE"] },
   { name: "Métodos de pago", roles: ["ADMIN", "JEFE"] },
 ]
+
+// ── General ───────────────────────────────────────────────
+function GeneralTab() {
+  const { theme, toggle } = useThemeStore()
+  const { touchMode, setTouchMode } = useUiStore()
+
+  return (
+    <div className="max-w-sm space-y-5">
+
+      {/* Apariencia */}
+      <div className="card p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+          Apariencia
+        </p>
+        <button
+          onClick={toggle}
+          className="w-full flex items-center justify-between gap-3 p-3 rounded-xl transition-all"
+          style={{ background: "var(--bg-tertiary)" }}>
+          <div className="flex items-center gap-3">
+            {theme === "dark"
+              ? <Moon size={18} style={{ color: "var(--brand)" }} />
+              : <Sun  size={18} style={{ color: "var(--warning)" }} />}
+            <div className="text-left">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                {theme === "dark" ? "Modo oscuro" : "Modo claro"}
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {theme === "dark" ? "Cambia a modo claro" : "Cambia a modo oscuro"}
+              </p>
+            </div>
+          </div>
+          {/* Toggle pill */}
+          <div className="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200"
+            style={{ background: theme === "dark" ? "var(--brand)" : "var(--bg-secondary)", border: "1.5px solid var(--border)" }}>
+            <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              style={{ transform: theme === "dark" ? "translateX(1.25rem)" : "translateX(0.1rem)" }} />
+          </div>
+        </button>
+      </div>
+
+      {/* Pantalla táctil */}
+      <div className="card p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+          Pantalla táctil
+        </p>
+        <button
+          onClick={() => setTouchMode()}
+          className="w-full flex items-center justify-between gap-3 p-3 rounded-xl transition-all"
+          style={{ background: "var(--bg-tertiary)" }}>
+          <div className="flex items-center gap-3">
+            <Touchpad size={18} style={{ color: touchMode ? "var(--brand)" : "var(--text-muted)" }} />
+            <div className="text-left">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                Modo táctil
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Toca la cantidad para abrir un teclado numérico
+              </p>
+            </div>
+          </div>
+          <div className="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200"
+            style={{ background: touchMode ? "var(--brand)" : "var(--bg-secondary)", border: "1.5px solid var(--border)" }}>
+            <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              style={{ transform: touchMode ? "translateX(1.25rem)" : "translateX(0.1rem)" }} />
+          </div>
+        </button>
+      </div>
+
+    </div>
+  )
+}
 
 // ── Usuarios ─────────────────────────────────────────────
 function UsersTab() {
@@ -417,6 +491,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="animate-fade-in">
+        {activeTab === "General"         && <GeneralTab />}
         {activeTab === "Negocio"         && <BusinessTab />}
         {activeTab === "Impresora"       && <PrinterTab />}
         {activeTab === "Usuarios"        && <UsersTab />}
