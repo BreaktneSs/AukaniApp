@@ -22,21 +22,24 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
   const cashReceived = Number(dispatch.cashReceived)
   const total = Number(dispatch.total)
   const isAccountDispatch = !!dispatch.account
+  const accent = isAccountDispatch ? "var(--info)" : "var(--warning)"
+  const accentLight = isAccountDispatch ? "var(--info-light)" : "var(--warning-light)"
 
   return (
-    <div className="card overflow-hidden animate-slide-up border-l-4"
-      style={{ borderLeftColor: isAccountDispatch ? "var(--info)" : "var(--warning)" }}>
+    <div className="card overflow-hidden animate-slide-up"
+      style={{ border: `2px solid ${accent}` }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: "var(--border)", background: isAccountDispatch ? "var(--info-light)" : "var(--warning-light)" }}>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm"
-            style={{ background: isAccountDispatch ? "var(--info)" : "var(--warning)" }}>
+      <div className="px-4 py-3 flex items-center justify-between"
+        style={{ background: accentLight }}>
+
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
+            style={{ background: accent }}>
             {dispatch.subShift?.user?.name?.[0]?.toUpperCase()}
           </div>
           <div>
-            <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            <p className="text-sm font-bold leading-tight" style={{ color: "var(--text-primary)" }}>
               {dispatch.subShift?.user?.name}
             </p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -44,42 +47,57 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
             </p>
           </div>
         </div>
+
         <div className="flex flex-col items-end gap-1">
-          {isAccountDispatch && (
-            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: "var(--info)", color: "white" }}>
+          {isAccountDispatch ? (
+            <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: accent, color: "white" }}>
               <User size={11} /> {dispatch.account.name}
             </span>
-          )}
-          <span className="font-display font-bold text-xl"
-            style={{ color: isAccountDispatch ? "var(--info)" : "var(--warning)" }}>
+          ) : dispatch.notes ? (
+            <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: accent, color: "white" }}>
+              <User size={11} /> {dispatch.notes}
+            </span>
+          ) : null}
+          <span className="font-sans font-bold text-2xl leading-none tracking-tight"
+            style={{ color: accent }}>
             {formatCOP(total)}
           </span>
         </div>
       </div>
 
       {/* Items */}
-      <div className="px-4 py-3 space-y-2 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="divide-y" style={{ borderColor: "var(--border)" }}>
         {dispatch.items.map(item => (
-          <div key={item.id} className="flex items-center gap-3">
+          <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+            {/* Imagen */}
             {item.product?.imageUrl ? (
               <img src={`/api${item.product.imageUrl}`} alt={item.product.name}
-                className="w-8 h-8 rounded object-cover shrink-0" />
+                className="w-12 h-12 rounded-lg object-cover shrink-0" />
             ) : (
-              <div className="w-8 h-8 rounded flex items-center justify-center shrink-0"
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
                 style={{ background: "var(--bg-tertiary)" }}>
-                <Package size={13} style={{ color: "var(--text-muted)" }} />
+                <Package size={18} style={{ color: "var(--text-muted)" }} />
               </div>
             )}
-            <div className="flex-1">
-              <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+
+            {/* Nombre */}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-base leading-tight truncate" style={{ color: "var(--text-primary)" }}>
                 {item.product?.name}
               </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                x{item.quantity}
+              <p className="text-xs font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {formatCOP(item.price)} c/u
               </p>
+            </div>
+
+            {/* Cantidad + subtotal */}
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="inline-flex items-center justify-center min-w-[2.5rem] h-9 px-2.5 rounded-lg font-sans font-bold text-lg text-white tracking-tight"
+                style={{ background: accent }}>
+                ×{item.quantity}
+              </span>
               <p className="text-sm font-mono font-bold" style={{ color: "var(--text-primary)" }}>
                 {formatCOP(Number(item.price) * item.quantity)}
               </p>
@@ -88,20 +106,22 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
         ))}
       </div>
 
-      {/* Resumen de caja — solo para despachos normales */}
-      {!isAccountDispatch && (
-        <div className="px-4 py-3 space-y-1.5 border-b" style={{ borderColor: "var(--border)" }}>
-          <div className="flex justify-between text-sm">
-            <span style={{ color: "var(--text-secondary)" }}>Cliente pagó</span>
-            <span className="font-mono font-semibold" style={{ color: "var(--text-primary)" }}>
+      {/* Resumen de pago — solo despachos normales */}
+      {!isAccountDispatch && cashReceived > 0 && (
+        <div className="mx-3 mb-3 rounded-xl overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+          <div className="flex justify-between items-center px-4 py-2.5 border-b"
+            style={{ borderColor: "var(--border)", background: "var(--bg-primary)" }}>
+            <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Recibido</span>
+            <span className="font-mono font-bold text-base" style={{ color: "var(--text-primary)" }}>
               {formatCOP(cashReceived)}
             </span>
           </div>
-          <div className="flex justify-between text-sm font-bold">
-            <span style={{ color: change > 0 ? "var(--brand)" : "var(--danger)" }}>
-              {change > 0 ? "🔄 Vuelto a devolver" : "❌ Sin vuelto"}
+          <div className="flex justify-between items-center px-4 py-2.5"
+            style={{ background: change > 0 ? "var(--brand-light)" : "var(--bg-primary)" }}>
+            <span className="text-xs font-bold" style={{ color: change > 0 ? "var(--brand)" : "var(--text-muted)" }}>
+              {change > 0 ? "Vuelto a entregar" : "Sin vuelto"}
             </span>
-            <span className="font-mono text-lg" style={{ color: change > 0 ? "var(--brand)" : "var(--text-muted)" }}>
+            <span className="font-sans font-bold text-xl tracking-tight" style={{ color: change > 0 ? "var(--brand)" : "var(--text-muted)" }}>
               {change > 0 ? formatCOP(change) : "—"}
             </span>
           </div>
@@ -109,7 +129,7 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
       )}
 
       {/* Acciones */}
-      <div className="flex gap-2 p-3">
+      <div className="flex gap-2 px-3 pb-3">
         <button
           onClick={() => onCancel(dispatch.id)}
           disabled={cancelling}
@@ -121,10 +141,10 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
         <button
           onClick={() => onConfirm(dispatch.id)}
           disabled={confirming}
-          className="btn-sm flex-1 text-white font-bold"
-          style={{ background: isAccountDispatch ? "var(--info)" : "var(--brand)" }}>
-          {confirming ? <Loader2 size={13} className="animate-spin" /> : isAccountDispatch ? <User size={13} /> : <CheckCircle size={13} />}
-          {isAccountDispatch ? "Agregar a cuenta" : "✅ Despachar"}
+          className="btn-md flex-1 text-white font-bold"
+          style={{ background: accent }}>
+          {confirming ? <Loader2 size={15} className="animate-spin" /> : isAccountDispatch ? <User size={15} /> : <CheckCircle size={15} />}
+          {isAccountDispatch ? "A cuenta" : "Despachar"}
         </button>
       </div>
     </div>

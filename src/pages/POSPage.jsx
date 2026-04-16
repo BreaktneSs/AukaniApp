@@ -490,11 +490,19 @@ export default function POSPage() {
     for (const ba of backendAccounts) {
       const remoteItems = ba.items.map(i => ({
         id: i.productId,
+        accountItemId: i.id,
         name: i.product?.name || "",
         price: i.price,
         quantity: i.quantity,
         fromAccount: true,
       }))
+      const { sales } = useCartStore.getState()
+      const exists = sales.some(s => s.type === "account" && s.backendId === ba.id)
+      if (!exists) {
+        // Cuenta creada desde caja remota — crear pestaña automáticamente
+        useCartStore.getState().newAccount(ba.name, ba.id)
+      }
+      // Siempre actualizar remoteItems (newAccount inicializa con [] y luego se llena aquí)
       updateAccountRemoteItems(ba.id, remoteItems)
     }
   }, [backendAccounts])
@@ -594,6 +602,15 @@ export default function POSPage() {
       qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
     },
     onError: e => toast.error(e.response?.data?.error || "Error al cerrar cuenta"),
+  })
+
+  // Eliminar item de cuenta remota
+  const { mutate: removeAccountItem, variables: removingItemId } = useMutation({
+    mutationFn: ({ accountBackendId, accountItemId }) => accountsService.removeItem(accountBackendId, accountItemId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error al eliminar item"),
   })
 
   // Venta
@@ -797,19 +814,32 @@ export default function POSPage() {
                       </span>
                       <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
                     </div>
-                    {remoteItems.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
-                          <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{formatCOP(item.price)}</p>
+                    {remoteItems.map((item, idx) => {
+                      const isRemoving = removingItemId?.accountItemId === item.accountItemId
+                      return (
+                        <div key={idx} className="flex items-center gap-2 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
+                            <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{formatCOP(item.price)}</p>
+                          </div>
+                          <span className="text-xs px-2 py-0.5 rounded font-mono font-bold"
+                            style={{ background: "var(--info-light)", color: "var(--info)" }}>×{item.quantity}</span>
+                          <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
+                            {formatCOP(Number(item.price) * item.quantity)}
+                          </p>
+                          {item.accountItemId && active?.backendId && (
+                            <button
+                              onClick={() => removeAccountItem({ accountBackendId: active.backendId, accountItemId: item.accountItemId })}
+                              disabled={isRemoving}
+                              className="btn-ghost w-6 h-6 rounded flex items-center justify-center shrink-0"
+                              style={{ color: "var(--danger)" }}
+                              title="Eliminar de la cuenta">
+                              {isRemoving ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+                            </button>
+                          )}
                         </div>
-                        <span className="text-xs px-2 py-0.5 rounded font-mono font-bold"
-                          style={{ background: "var(--info-light)", color: "var(--info)" }}>×{item.quantity}</span>
-                        <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
-                          {formatCOP(Number(item.price) * item.quantity)}
-                        </p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </>
                 )}
               </>
