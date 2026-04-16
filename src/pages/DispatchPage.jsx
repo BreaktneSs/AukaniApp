@@ -5,14 +5,15 @@ import { shiftsService } from "@/services/shifts.service"
 import { formatCOP } from "@/utils/currency"
 import {
   Bell, CheckCircle, XCircle, Clock, Package,
-  Loader2, Users, ChevronDown, ChevronUp, X, User,
+  Loader2, Users, ChevronDown, ChevronUp, X, User, Truck,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { confirm } from "@/components/ui/ConfirmDialog"
 
 const STATUS = {
   PENDING:    { label: "Pendiente",   color: "var(--warning)", bg: "var(--warning-light)", icon: Clock },
-  DISPATCHED: { label: "Despachado",  color: "var(--brand)",   bg: "var(--brand-light)",   icon: CheckCircle },
+  DISPATCHED: { label: "En camino",   color: "var(--info)",    bg: "var(--info-light)",    icon: Truck },
+  DELIVERED:  { label: "Entregado",   color: "var(--brand)",   bg: "var(--brand-light)",   icon: CheckCircle },
   CANCELLED:  { label: "Cancelado",   color: "var(--danger)",  bg: "var(--danger-light)",  icon: XCircle },
 }
 
@@ -151,6 +152,83 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
   )
 }
 
+// ── Tarjeta de entrega pendiente ──────────────────────────
+function DeliveryCard({ dispatch, onDeliver, delivering }) {
+  const label = dispatch.account?.name || dispatch.notes || "Sin identificar"
+  const isAccount = !!dispatch.account
+
+  return (
+    <div className="card overflow-hidden animate-slide-up"
+      style={{ border: "2px solid var(--info)" }}>
+
+      {/* Header */}
+      <div className="px-4 py-3 flex items-center justify-between"
+        style={{ background: "var(--info-light)" }}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: "var(--info)" }}>
+            {isAccount
+              ? <User size={16} className="text-white" />
+              : <span className="font-bold text-white text-sm">{dispatch.subShift?.user?.name?.[0]?.toUpperCase()}</span>
+            }
+          </div>
+          <div>
+            <p className="font-bold text-sm leading-tight" style={{ color: "var(--text-primary)" }}>
+              {label}
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Mesero: {dispatch.subShift?.user?.name}
+              {dispatch.dispatchedAt && (
+                <> · {new Date(dispatch.dispatchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</>
+              )}
+            </p>
+          </div>
+        </div>
+        <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
+          style={{ background: "var(--info)", color: "white" }}>
+          <Truck size={11} /> En camino
+        </span>
+      </div>
+
+      {/* Productos */}
+      <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+        {dispatch.items.map(item => (
+          <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
+            {item.product?.imageUrl ? (
+              <img src={`/api${item.product.imageUrl}`} alt={item.product.name}
+                className="w-10 h-10 rounded-lg object-cover shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: "var(--bg-tertiary)" }}>
+                <Package size={15} style={{ color: "var(--text-muted)" }} />
+              </div>
+            )}
+            <p className="flex-1 font-medium text-sm truncate" style={{ color: "var(--text-primary)" }}>
+              {item.product?.name}
+            </p>
+            <span className="inline-flex items-center justify-center min-w-[2.25rem] h-8 px-2 rounded-lg font-sans font-bold text-base text-white shrink-0"
+              style={{ background: "var(--info)" }}>
+              ×{item.quantity}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Acción */}
+      <div className="p-3">
+        <button
+          onClick={() => onDeliver(dispatch.id)}
+          disabled={delivering}
+          className="btn-md w-full text-white font-bold"
+          style={{ background: "var(--brand)" }}>
+          {delivering ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+          Confirmar entrega
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── DispatchPage ──────────────────────────────────────────
 export default function DispatchPage() {
   const [showHistory, setShowHistory] = useState(false)
@@ -169,6 +247,14 @@ export default function DispatchPage() {
   const { data: pending = [], isLoading } = useQuery({
     queryKey: ["dispatches-pending", shift?.id],
     queryFn: () => dispatchService.getPendingDispatches(shift.id),
+    enabled: !!shift?.id,
+    refetchInterval: 5_000,
+  })
+
+  // Pedidos despachados (en camino) — polling cada 5s
+  const { data: dispatched = [] } = useQuery({
+    queryKey: ["dispatches-dispatched", shift?.id],
+    queryFn: () => dispatchService.getDispatchedOrders(shift.id),
     enabled: !!shift?.id,
     refetchInterval: 5_000,
   })
@@ -218,6 +304,16 @@ export default function DispatchPage() {
     onSuccess: () => {
       toast.success("Pedido cancelado")
       qc.invalidateQueries({ queryKey: ["dispatches-pending"] })
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  const deliver = useMutation({
+    mutationFn: dispatchService.deliverDispatch,
+    onSuccess: () => {
+      toast.success("✅ Entrega confirmada")
+      qc.invalidateQueries({ queryKey: ["dispatches-dispatched"] })
+      qc.invalidateQueries({ queryKey: ["dispatches-history"] })
     },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
@@ -301,6 +397,32 @@ export default function DispatchPage() {
               cancelling={cancel.isPending && cancel.variables === dispatch.id}
             />
           ))}
+        </div>
+      )}
+
+      {/* En camino — despachados pero no entregados */}
+      {dispatched.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Truck size={16} style={{ color: "var(--info)" }} />
+            <h2 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>
+              En camino
+            </h2>
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold text-white"
+              style={{ background: "var(--info)" }}>
+              {dispatched.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {dispatched.map(d => (
+              <DeliveryCard
+                key={d.id}
+                dispatch={d}
+                onDeliver={(id) => deliver.mutate(id)}
+                delivering={deliver.isPending && deliver.variables === d.id}
+              />
+            ))}
+          </div>
         </div>
       )}
 
