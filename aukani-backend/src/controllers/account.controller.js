@@ -20,6 +20,13 @@ export const accountController = {
     reply.send(accounts)
   },
 
+  async removeItem(req, reply) {
+    const accountId = Number(req.params.id)
+    const itemId    = Number(req.params.itemId)
+    await accountService.removeItem(accountId, itemId)
+    reply.code(204).send()
+  },
+
   async close(req, reply) {
     const account = await accountService.close(Number(req.params.id))
     await auditService.log({

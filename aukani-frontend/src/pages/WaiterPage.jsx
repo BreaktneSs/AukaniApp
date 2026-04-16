@@ -175,6 +175,7 @@ function CartItem({ item, onUpdate, onRemove }) {
 // ── Panel de pago multi-método ────────────────────────────
 function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
   const [payments, setPayments] = useState([])
+  const [customerName, setCustomerName] = useState("")
 
   const { data: paymentMethods = [] } = useQuery({
     queryKey: ["payment-methods"],
@@ -205,6 +206,7 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
         paymentMethodId: p.paymentMethodId,
         amount: p.amount,
       })),
+      customerName: customerName.trim() || null,
     }),
     onSuccess: () => { toast.success("✅ Pedido enviado al cajero"); onSent() },
     onError: e => toast.error(e.response?.data?.error || "Error al enviar pedido"),
@@ -299,6 +301,21 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
         </div>
       )}
 
+      {/* Nombre del cliente */}
+      <div>
+        <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          Nombre del cliente <span style={{ color: "var(--text-muted)" }}>(opcional)</span>
+        </label>
+        <input
+          type="text"
+          className="input text-sm"
+          placeholder="ej. Mesa 3, Juan, Domicilio..."
+          value={customerName}
+          onChange={e => setCustomerName(e.target.value)}
+          maxLength={60}
+        />
+      </div>
+
       <div className="flex gap-2">
         <button onClick={onCancel} className="btn-outline btn-md flex-1">Cancelar</button>
         <button onClick={() => send()} disabled={isPending || totalPaid < total} className="btn-primary btn-md flex-1">
@@ -311,9 +328,12 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
 }
 
 // ── Panel enviar a cuenta ─────────────────────────────────
-function SendToAccountPanel({ items, accounts, isLoadingAccounts, subShiftId, onSent, onCancel }) {
+function SendToAccountPanel({ items, accounts, isLoadingAccounts, subShiftId, parentShiftId, onSent, onCancel }) {
   const [selectedAccountId, setSelectedAccountId] = useState(null)
+  const [newAccountName, setNewAccountName] = useState("")
+  const [showNewAccount, setShowNewAccount] = useState(false)
   const isLoading = isLoadingAccounts
+  const qc = useQueryClient()
 
   const { mutate: send, isPending } = useMutation({
     mutationFn: (accId) => dispatchService.createDispatch({
@@ -325,17 +345,68 @@ function SendToAccountPanel({ items, accounts, isLoadingAccounts, subShiftId, on
     onError: e => toast.error(e.response?.data?.error || "Error al enviar"),
   })
 
+  const { mutate: createAccount, isPending: creatingAccount } = useMutation({
+    mutationFn: () => accountsService.create(parentShiftId, newAccountName.trim()),
+    onSuccess: (newAcc) => {
+      qc.invalidateQueries({ queryKey: ["accounts-shift", parentShiftId] })
+      setSelectedAccountId(newAcc.id)
+      setNewAccountName("")
+      setShowNewAccount(false)
+      toast.success(`Cuenta "${newAcc.name}" creada`)
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error al crear cuenta"),
+  })
+
   return (
     <div className="space-y-3 animate-slide-up">
       <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
-        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Seleccionar cuenta</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Seleccionar cuenta</p>
+          {!showNewAccount && (
+            <button
+              onClick={() => setShowNewAccount(true)}
+              className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md transition-colors"
+              style={{ color: "var(--info)", background: "var(--info-light)" }}>
+              <Plus size={11} /> Nueva cuenta
+            </button>
+          )}
+        </div>
+
+        {showNewAccount && (
+          <div className="flex items-center gap-1.5 mb-2 animate-slide-up">
+            <input
+              type="text"
+              className="input text-sm flex-1"
+              placeholder="Nombre de la cuenta..."
+              value={newAccountName}
+              onChange={e => setNewAccountName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && newAccountName.trim() && createAccount()}
+              autoFocus
+              maxLength={40}
+            />
+            <button
+              onClick={() => createAccount()}
+              disabled={creatingAccount || !newAccountName.trim()}
+              className="btn-sm text-white font-semibold px-3"
+              style={{ background: "var(--info)" }}>
+              {creatingAccount ? <Loader2 size={12} className="animate-spin" /> : "Crear"}
+            </button>
+            <button
+              onClick={() => { setShowNewAccount(false); setNewAccountName("") }}
+              className="btn-ghost w-8 h-8 rounded flex items-center justify-center"
+              style={{ color: "var(--text-muted)" }}>
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex justify-center py-3">
             <Loader2 size={16} className="animate-spin" style={{ color: "var(--text-muted)" }} />
           </div>
-        ) : accounts.length === 0 ? (
+        ) : accounts.length === 0 && !showNewAccount ? (
           <p className="text-xs text-center py-3" style={{ color: "var(--text-muted)" }}>
-            No hay cuentas abiertas en esta caja
+            No hay cuentas abiertas — crea una nueva arriba
           </p>
         ) : (
           <div className="space-y-1.5 max-h-40 overflow-y-auto">
@@ -595,10 +666,9 @@ export default function WaiterPage() {
                   <Send size={15} /> Cobrar
                 </button>
                 <button onClick={() => setShowAccountSend(true)}
-                  disabled={cart.length === 0 || openAccounts.length === 0}
-                  title={openAccounts.length === 0 ? "No hay cuentas abiertas" : undefined}
+                  disabled={cart.length === 0}
                   className="btn-md flex-1 text-white font-semibold"
-                  style={{ background: openAccounts.length > 0 ? "var(--info)" : "var(--bg-tertiary)", color: openAccounts.length > 0 ? "white" : "var(--text-muted)" }}>
+                  style={{ background: "var(--info)" }}>
                   <User size={15} /> A cuenta {openAccounts.length > 0 && <span className="text-xs opacity-75">({openAccounts.length})</span>}
                 </button>
               </div>
@@ -616,6 +686,7 @@ export default function WaiterPage() {
                 accounts={openAccounts}
                 isLoadingAccounts={accountsLoading}
                 subShiftId={subShift.id}
+                parentShiftId={subShift.parentShiftId}
                 onSent={() => { setCart([]); setShowAccountSend(false) }}
                 onCancel={() => setShowAccountSend(false)}
               />

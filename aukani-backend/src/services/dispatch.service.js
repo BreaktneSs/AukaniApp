@@ -57,7 +57,7 @@ export const dispatchService = {
 
   // ── Pedidos de despacho ───────────────────────────────────
 
-  async createDispatch({ subShiftId, items, payments = [], accountId = null }) {
+  async createDispatch({ subShiftId, items, payments = [], accountId = null, customerName = null }) {
     const subShift = await prisma.subShift.findUnique({
       where: { id: subShiftId },
       include: { parentShift: true },
@@ -134,6 +134,7 @@ export const dispatchService = {
           total,
           cashReceived,
           change,
+          notes: customerName?.trim() || null,
           items: { create: dispatchItems.map(({ productId, quantity, price }) => ({ productId, quantity, price })) },
           ...(netPayments.length > 0 && { payments: { create: netPayments } }),
         },
