@@ -9,7 +9,7 @@ export const shiftService = {
         shiftPayments: { include: { paymentMethod: true } },
         _count: { select: { orders: true } },
         orders: {
-          where: { status: "COMPLETED" },
+          where: { status: { in: ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"] } },
           select: {
             payments: {
               select: {
@@ -57,7 +57,7 @@ export const shiftService = {
     const shift = await prisma.shift.findUnique({
       where: { id: shiftId },
       include: {
-        orders: { where: { status: { in: ["COMPLETED", "PARTIAL_REFUND"] } }, include: { payments: true } },
+        orders: { where: { status: { in: ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"] } }, include: { payments: true } },
         shiftPayments: true,
       },
     })
@@ -144,7 +144,7 @@ export const shiftService = {
           _count: { select: { orders: true } },
           // Para turnos abiertos: calcular ventas en tiempo real desde las órdenes
           orders: {
-            where: { status: "COMPLETED" },
+            where: { status: { in: ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"] } },
             select: {
               payments: {
                 select: {
@@ -216,7 +216,7 @@ export const shiftService = {
     // Si está abierto, calcular shiftPayments en tiempo real
     if (shift.status === "OPEN") {
       const livePaymentTotals = {}
-      for (const order of shift.orders.filter(o => o.status === "COMPLETED")) {
+      for (const order of shift.orders.filter(o => ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"].includes(o.status))) {
         for (const payment of order.payments) {
           const id = payment.paymentMethod?.id
           if (!livePaymentTotals[id]) {
