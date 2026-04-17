@@ -95,8 +95,8 @@ export const orderService = {
     })
   },
 
-  // items: [{ orderItemId, quantity }]
-  async refund(orderId, userId, items) {
+  // items: [{ orderItemId, quantity }], refundPaymentMethodId: Int
+  async refund(orderId, userId, items, refundPaymentMethodId) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { items: { include: { product: true } } },
@@ -104,6 +104,10 @@ export const orderService = {
     if (!order) throw { statusCode: 404, message: "Venta no encontrada" }
     if (order.status === "CANCELLED")      throw { statusCode: 409, message: "La venta está cancelada" }
     if (order.status === "REFUNDED")       throw { statusCode: 409, message: "La venta ya fue devuelta completamente" }
+    if (!refundPaymentMethodId)            throw { statusCode: 400, message: "Debes indicar el método de devolución" }
+
+    const paymentMethod = await prisma.paymentMethod.findUnique({ where: { id: refundPaymentMethodId } })
+    if (!paymentMethod) throw { statusCode: 400, message: "Método de pago no encontrado" }
 
     // Validar que cada item exista en la orden y la cantidad sea válida
     for (const r of items) {
@@ -147,8 +151,12 @@ export const orderService = {
         }
       }
 
+      // Registrar el pago de devolución como monto negativo en el mismo turno
+      await tx.orderPayment.create({
+        data: { orderId, paymentMethodId: refundPaymentMethodId, amount: -refundTotal },
+      })
+
       // Calcular el estado tras aplicar esta devolución
-      // Leer los items actualizados para tener los refundedQty frescos
       const updatedItems = await tx.orderItem.findMany({ where: { orderId } })
       const isFullRefund = updatedItems.every(oi => oi.refundedQty >= oi.quantity)
       const newStatus = isFullRefund ? "REFUNDED" : "PARTIAL_REFUND"
@@ -163,7 +171,7 @@ export const orderService = {
         },
       })
 
-      return { order: updatedOrder, refundTotal, refundedItems: items }
+      return { order: updatedOrder, refundTotal, refundedItems: items, refundPaymentMethod: paymentMethod.name }
     })
   },
 

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ordersService } from "@/services/orders.service"
+import { paymentMethodsService } from "@/services/catalog.service"
 import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react"
 import { confirm } from "@/components/ui/ConfirmDialog"
 import { formatCOP } from "@/utils/currency"
@@ -109,7 +110,7 @@ function OrderDetail({ order, onClose, onRefund }) {
 }
 
 // ── Refund modal ──────────────────────────────────────────────────────────────
-function RefundModal({ order, onClose, onConfirm, isLoading }) {
+function RefundModal({ order, onClose, onConfirm, isLoading, paymentMethods }) {
   // Only items that still have remaining quantity to return
   const refundableItems = useMemo(
     () => order.items.filter(i => (i.refundedQty ?? 0) < i.quantity),
@@ -117,6 +118,7 @@ function RefundModal({ order, onClose, onConfirm, isLoading }) {
   )
 
   const [selection, setSelection] = useState({})
+  const [refundPaymentMethodId, setRefundPaymentMethodId] = useState(null)
 
   const remaining = (item) => item.quantity - (item.refundedQty ?? 0)
 
@@ -127,8 +129,7 @@ function RefundModal({ order, onClose, onConfirm, isLoading }) {
         delete next[itemId]
         return next
       }
-      const item = refundableItems.find(i => i.id === itemId)
-      return { ...prev, [itemId]: remaining(item) }
+      return { ...prev, [itemId]: 1 }
     })
   }
 
@@ -154,12 +155,12 @@ function RefundModal({ order, onClose, onConfirm, isLoading }) {
   }
 
   const handleConfirm = () => {
-    if (selectedCount === 0) return
+    if (selectedCount === 0 || !refundPaymentMethodId) return
     const items = Object.entries(selection).map(([orderItemId, quantity]) => ({
       orderItemId: Number(orderItemId),
       quantity,
     }))
-    onConfirm(items)
+    onConfirm(items, refundPaymentMethodId)
   }
 
   return (
@@ -257,7 +258,7 @@ function RefundModal({ order, onClose, onConfirm, isLoading }) {
         </div>
 
         {/* Refund total */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg mb-4"
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg mb-3"
           style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}>
           <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Total a devolver</span>
           <span className="font-mono font-bold text-lg" style={{ color: "var(--warning)" }}>
@@ -265,13 +266,44 @@ function RefundModal({ order, onClose, onConfirm, isLoading }) {
           </span>
         </div>
 
+        {/* Refund payment method */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>
+            Método de devolución
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(paymentMethods || []).map(pm => {
+              const active = refundPaymentMethodId === pm.id
+              return (
+                <button
+                  key={pm.id}
+                  onClick={() => setRefundPaymentMethodId(pm.id)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: active ? "var(--warning)" : "var(--bg-primary)",
+                    color: active ? "#fff" : "var(--text-secondary)",
+                    border: `1.5px solid ${active ? "var(--warning)" : "var(--border)"}`,
+                  }}
+                >
+                  {pm.name}
+                </button>
+              )
+            })}
+          </div>
+          {!refundPaymentMethodId && selectedCount > 0 && (
+            <p className="text-xs mt-1.5" style={{ color: "var(--danger)" }}>
+              Selecciona el método de devolución
+            </p>
+          )}
+        </div>
+
         <div className="flex gap-2">
           <button onClick={onClose} disabled={isLoading} className="btn-outline btn-md flex-1">Cancelar</button>
-          <button onClick={handleConfirm} disabled={selectedCount === 0 || isLoading}
+          <button onClick={handleConfirm} disabled={selectedCount === 0 || !refundPaymentMethodId || isLoading}
             className="btn-md flex-1 flex items-center justify-center gap-2"
             style={{
-              background: selectedCount > 0 ? "var(--warning)" : "var(--bg-secondary)",
-              color: selectedCount > 0 ? "#fff" : "var(--text-muted)",
+              background: selectedCount > 0 && refundPaymentMethodId ? "var(--warning)" : "var(--bg-secondary)",
+              color: selectedCount > 0 && refundPaymentMethodId ? "#fff" : "var(--text-muted)",
               opacity: isLoading ? 0.7 : 1,
             }}>
             {isLoading ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
@@ -295,6 +327,12 @@ export default function SalesPage() {
     queryFn: () => ordersService.getAll({ page, limit: 20 }),
   })
 
+  const { data: paymentMethods = [] } = useQuery({
+    queryKey: ["payment-methods"],
+    queryFn: paymentMethodsService.getAll,
+    staleTime: Infinity,
+  })
+
   const cancel = useMutation({
     mutationFn: ordersService.cancel,
     onSuccess: () => { toast.success("Venta cancelada"); qc.invalidateQueries({ queryKey: ["orders"] }) },
@@ -302,9 +340,9 @@ export default function SalesPage() {
   })
 
   const refund = useMutation({
-    mutationFn: ({ id, items }) => ordersService.refund(id, items),
+    mutationFn: ({ id, items, refundPaymentMethodId }) => ordersService.refund(id, items, refundPaymentMethodId),
     onSuccess: (result) => {
-      toast.success(`Devolución registrada · ${formatCOP(result.refundTotal)}`)
+      toast.success(`Devolución registrada · ${formatCOP(result.refundTotal)} vía ${result.refundPaymentMethod}`)
       setRefundOrder(null)
       qc.invalidateQueries({ queryKey: ["orders"] })
     },
@@ -425,7 +463,7 @@ export default function SalesPage() {
         <OrderDetail
           order={detail}
           onClose={() => setDetail(null)}
-          onRefund={order => { setDetail(null); setRefundOrder(order) }}
+          onRefund={order => { setDetail(null); openRefundFor(order) }}
         />
       )}
 
@@ -434,7 +472,8 @@ export default function SalesPage() {
           order={refundOrder}
           onClose={() => setRefundOrder(null)}
           isLoading={refund.isPending}
-          onConfirm={items => refund.mutate({ id: refundOrder.id, items })}
+          paymentMethods={paymentMethods}
+          onConfirm={(items, refundPaymentMethodId) => refund.mutate({ id: refundOrder.id, items, refundPaymentMethodId })}
         />
       )}
     </div>

@@ -50,13 +50,13 @@ export const orderController = {
   },
 
   async refund(req, reply) {
-    const { items } = req.body
-    const result = await orderService.refund(Number(req.params.id), req.user.id, items)
+    const { items, refundPaymentMethodId } = req.body
+    const result = await orderService.refund(Number(req.params.id), req.user.id, items, Number(refundPaymentMethodId))
     auditService.log({
       userId: req.user.id, userName: req.user.name, userRole: req.user.role,
       action: "SALE_REFUND", entity: "ORDER", entityId: result.order.id,
       entityLabel: `Devolución venta #${result.order.id}`,
-      newValues: { refundTotal: result.refundTotal, itemCount: items.length },
+      newValues: { refundTotal: result.refundTotal, itemCount: items.length, refundPaymentMethod: result.refundPaymentMethod },
       ip: ip(req),
     })
     return reply.send(result)
