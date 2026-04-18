@@ -19,6 +19,13 @@ export const shiftService = {
             },
           },
         },
+        expenses: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: { select: { id: true, name: true } },
+            paymentMethod: { select: { id: true, name: true } },
+          },
+        },
       },
     })
 
@@ -43,8 +50,8 @@ export const shiftService = {
       paymentMethod: data.paymentMethod,
     }))
 
-    const { orders, ...rest } = shift
-    return { ...rest, shiftPayments: liveShiftPayments }
+    const { orders, expenses, ...rest } = shift
+    return { ...rest, shiftPayments: liveShiftPayments, expenses: expenses || [] }
   },
 
   async openShift(userId, openingCash) {
@@ -66,7 +73,7 @@ export const shiftService = {
     if (shift.userId !== userId) throw { statusCode: 403, message: "No puedes cerrar el turno de otro cajero" }
     if (shift.status === "CLOSED") throw { statusCode: 409, message: "El turno ya está cerrado" }
 
-    // Calcular totales por método de pago desde las órdenes reales
+    // Ventas netas por método de pago (incluye devoluciones negativas, NO egresos)
     const paymentTotals = {}
     for (const order of shift.orders) {
       for (const payment of order.payments) {
@@ -74,10 +81,14 @@ export const shiftService = {
       }
     }
 
-    // Total esperado en efectivo
+    // Egresos: solo para calcular expectedCash, no tocan shiftPayments
+    const expenses = await prisma.expense.findMany({ where: { shiftId } })
     const cashMethod = await prisma.paymentMethod.findFirst({ where: { name: "Efectivo" } })
     const cashSales = paymentTotals[cashMethod?.id] || 0
-    const expectedCash = Number(shift.openingCash) + cashSales
+    const cashExpenses = expenses
+      .filter(e => e.paymentMethodId === cashMethod?.id)
+      .reduce((s, e) => s + Number(e.amount), 0)
+    const expectedCash = Number(shift.openingCash) + cashSales - cashExpenses
     const difference = Number(closingCash) - expectedCash
 
     const shiftPaymentData = Object.entries(paymentTotals).map(([methodId, total]) => ({
@@ -206,6 +217,13 @@ export const shiftService = {
           include: {
             items: { include: { product: { select: { name: true } } } },
             payments: { include: { paymentMethod: true } },
+          },
+        },
+        expenses: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: { select: { id: true, name: true } },
+            paymentMethod: { select: { id: true, name: true } },
           },
         },
       },

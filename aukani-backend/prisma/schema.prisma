@@ -54,6 +54,7 @@ model User {
   subShifts  SubShift[]
   orders     Order[]
   movements  InventoryMovement[]
+  expenses   Expense[]
 
   @@index([email])
   @@index([role])
@@ -81,6 +82,7 @@ model PaymentMethod {
   payments         OrderPayment[]
   shiftPayments    ShiftPayment[]
   dispatchPayments DispatchPayment[]
+  expenses         Expense[]
 }
 
 // ─── PRODUCTOS ───────────────────────────────────────────
@@ -132,6 +134,7 @@ model Shift {
   shiftPayments ShiftPayment[]
   subShifts     SubShift[]
   accounts      Account[]
+  expenses      Expense[]
 
   @@index([userId])
   @@index([status])
@@ -148,6 +151,23 @@ model ShiftPayment {
   paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
 
   @@unique([shiftId, paymentMethodId])
+}
+
+model Expense {
+  id              Int      @id @default(autoincrement())
+  shiftId         Int
+  userId          Int
+  concept         String
+  amount          Decimal  @db.Decimal(10, 2)
+  paymentMethodId Int
+  createdAt       DateTime @default(now())
+
+  shift         Shift         @relation(fields: [shiftId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([shiftId])
+  @@index([createdAt])
 }
 
 // ─── VENTAS ──────────────────────────────────────────────
@@ -358,6 +378,9 @@ enum AuditAction {
   ACCOUNT_CREATE
   ACCOUNT_CLOSE
   ACCOUNT_ADD_ITEMS
+  ACCOUNT_ITEM_REMOVE
+  EXPENSE_CREATE
+  EXPENSE_DELETE
 }
 
 enum AuditEntity {
@@ -370,6 +393,7 @@ enum AuditEntity {
   DISPATCH
   INVENTORY
   ACCOUNT
+  EXPENSE
 }
 
 model AuditLog {

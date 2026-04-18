@@ -325,7 +325,11 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
   const cashPayment = shift?.shiftPayments?.find(p => p.paymentMethod?.name === "Efectivo")
   const cashSales = Number(cashPayment?.total || 0)
   const openingCash = Number(shift?.openingCash || 0)
-  const expectedCash = openingCash + cashSales
+  const cashExpenses = (shift?.expenses || [])
+    .filter(e => e.paymentMethod?.name === "Efectivo")
+    .reduce((s, e) => s + Number(e.amount), 0)
+  const totalExpenses = (shift?.expenses || []).reduce((s, e) => s + Number(e.amount), 0)
+  const expectedCash = openingCash + cashSales - cashExpenses
   const difference = rawClosing !== "" ? closingCash - expectedCash : null
   const totalSales = (shift?.shiftPayments || []).reduce((s, p) => s + Number(p.total), 0)
 
@@ -394,6 +398,32 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
           )}
         </div>
 
+        {/* ── Egresos ── */}
+        {totalExpenses > 0 && (
+          <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>
+              Egresos del turno
+            </p>
+            <div className="space-y-1.5">
+              {shift.expenses.map(e => (
+                <div key={e.id} className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{e.concept}</span>
+                    <span className="text-xs ml-2" style={{ color: "var(--text-muted)" }}>· {e.paymentMethod?.name}</span>
+                  </div>
+                  <span className="text-sm font-bold shrink-0 ml-3" style={{ color: "var(--danger)", ...NUM }}>
+                    −{formatCOP(e.amount)}
+                  </span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                <span className="text-sm font-bold" style={{ color: "var(--danger)" }}>Total egresos</span>
+                <span className="text-base font-bold" style={{ color: "var(--danger)", ...NUM }}>−{formatCOP(totalExpenses)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Efectivo esperado ── */}
         <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>
@@ -407,6 +437,12 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
                 {" apertura + "}
                 <span style={{ color: "var(--text-secondary)" }}>{formatCOP(cashSales)}</span>
                 {" ventas"}
+                {cashExpenses > 0 && (
+                  <> {" − "}
+                    <span style={{ color: "var(--danger)" }}>{formatCOP(cashExpenses)}</span>
+                    {" egresos"}
+                  </>
+                )}
               </p>
             </div>
             <p className="text-xl font-bold" style={{ color: "var(--brand)", ...NUM }}>
