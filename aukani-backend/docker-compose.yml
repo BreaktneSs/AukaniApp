@@ -1,20 +1,13 @@
 services:
-  db:
-    image: postgres:16-alpine
+  api:
+    build: .
+    container_name: aukani_api
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-aukani}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aukani_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-aukani_pos}
+    env_file: .env
     ports:
-      - "5432:5432"
+      - "3000:3000"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aukani} -d ${POSTGRES_DB:-aukani_pos}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./uploads:/app/uploads
+      - ./downloads:/app/downloads
 
-volumes:
-  postgres_data:
+volumes: {}
