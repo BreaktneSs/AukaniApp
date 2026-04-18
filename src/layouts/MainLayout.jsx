@@ -5,19 +5,20 @@ import { useThemeStore } from "@/store/theme.store"
 import {
   ShoppingCart, BarChart3, ClipboardList, Settings,
   LogOut, Sun, Moon, Boxes, Menu,
-  Landmark, Smartphone, Bell, ShieldCheck
+  Landmark, Smartphone, Bell, ShieldCheck, CalendarDays
 } from "lucide-react"
 
 const nav = [
-  { to: "/pos",       icon: ShoppingCart,    label: "Caja",          roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/waiter",    icon: Smartphone,      label: "Caja remota",   roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/dispatch",  icon: Bell,            label: "Despachos",     roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/inventory", icon: Boxes,           label: "Inventario",    roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/sales",     icon: ClipboardList,   label: "Ventas/Devoluciones",        roles: ["ADMIN","JEFE","VENDEDOR"] },
-  { to: "/shifts",    icon: Landmark,        label: "Control caja",  roles: ["ADMIN","JEFE"] },
-  { to: "/dashboard", icon: BarChart3,       label: "Dashboard",     roles: ["ADMIN","JEFE"] },
-  { to: "/settings",  icon: Settings,        label: "Config.",       roles: ["ADMIN", "JEFE", "VENDEDOR"] },
-  { to: "/audit",     icon: ShieldCheck,     label: "Auditoría",     roles: ["ADMIN"] },
+  { to: "/pos",          icon: ShoppingCart,  label: "Caja",               roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/waiter",       icon: Smartphone,    label: "Caja remota",        roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/dispatch",     icon: Bell,          label: "Despachos",          roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/reservations", icon: CalendarDays,  label: "Reservas",           roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/inventory",    icon: Boxes,         label: "Inventario",         roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/sales",        icon: ClipboardList, label: "Ventas/Devoluciones",roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/shifts",       icon: Landmark,      label: "Control caja",       roles: ["ADMIN","JEFE"] },
+  { to: "/dashboard",    icon: BarChart3,     label: "Dashboard",          roles: ["ADMIN","JEFE"] },
+  { to: "/settings",     icon: Settings,      label: "Config.",            roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/audit",        icon: ShieldCheck,   label: "Auditoría",          roles: ["ADMIN"] },
 ]
 
 export default function MainLayout() {

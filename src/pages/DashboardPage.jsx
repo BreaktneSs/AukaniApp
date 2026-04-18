@@ -258,11 +258,25 @@ function AccountingSection() {
     staleTime: 60_000,
   })
 
+  const [trendFilter, setTrendFilter] = useState("all")
+
   const s = data?.summary
-  const trend  = data?.dailyTrend      || []
+  const rawTrend = data?.dailyTrend || []
+  const trend = rawTrend.map(d => ({
+    ...d,
+    revenue: trendFilter === "services" ? (d.revenueServices ?? 0)
+           : trendFilter === "products" ? (d.revenueProducts ?? 0)
+           : d.revenue,
+  }))
   const pmts   = data?.paymentBreakdown || []
   const tops   = data?.topProducts     || []
   const maxTop = Math.max(...tops.map(p => p.revenue), 1)
+
+  const TREND_FILTERS = [
+    { key: "all",      label: "Todo" },
+    { key: "services", label: "Servicios" },
+    { key: "products", label: "Productos" },
+  ]
 
   return (
     <div className="space-y-4">
@@ -355,11 +369,26 @@ function AccountingSection() {
 
           {/* Tendencia diaria — ancho completo */}
           <div className="card p-5 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Tendencia de ventas</h3>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: "var(--brand)" }}>
-                  <ArrowUpRight size={13} />
-                  <span>{trend.filter(d => d.revenue > 0).length} días activos</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {TREND_FILTERS.map(f => (
+                      <button key={f.key} onClick={() => setTrendFilter(f.key)}
+                        className="px-2.5 py-1 rounded text-xs font-medium transition-all border"
+                        style={{
+                          background: trendFilter === f.key ? "var(--brand)" : "transparent",
+                          borderColor: trendFilter === f.key ? "var(--brand)" : "var(--border)",
+                          color: trendFilter === f.key ? "#fff" : "var(--text-muted)",
+                        }}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-medium" style={{ color: "var(--brand)" }}>
+                    <ArrowUpRight size={13} />
+                    <span>{trend.filter(d => d.revenue > 0).length} días activos</span>
+                  </div>
                 </div>
               </div>
 
@@ -371,15 +400,13 @@ function AccountingSection() {
               ) : (
                 <>
                   <LineChart data={trend} />
-                  <div className="grid grid-cols-3 gap-2 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
                     {(() => {
                       const best  = trend.reduce((a, b) => b.revenue > a.revenue ? b : a, trend[0])
-                      const total = trend.reduce((s, d) => s + d.revenue, 0)
                       const active = trend.filter(d => d.revenue > 0).length
                       const fmt = (d) => new Date(d + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short" })
                       return [
                         { label: "Mejor día", value: best?.revenue > 0 ? fmt(best.date) : "—", color: "var(--brand)" },
-                        { label: "Total período", value: formatCOP(total), color: "var(--text-primary)" },
                         { label: "Días con ventas", value: active, color: "var(--info)" },
                       ].map(item => (
                         <div key={item.label} className="text-center">
