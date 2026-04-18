@@ -50,11 +50,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  shifts     Shift[]
-  subShifts  SubShift[]
-  orders     Order[]
-  movements  InventoryMovement[]
-  expenses   Expense[]
+  shifts                Shift[]
+  subShifts             SubShift[]
+  orders                Order[]
+  movements             InventoryMovement[]
+  expenses              Expense[]
+  createdReservations   Reservation[] @relation("ReservationCreatedBy")
+  completedReservations Reservation[] @relation("ReservationCompletedBy")
+  cancelledReservations Reservation[] @relation("ReservationCancelledBy")
 
   @@index([email])
   @@index([role])
@@ -79,10 +82,13 @@ model PaymentMethod {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  payments         OrderPayment[]
-  shiftPayments    ShiftPayment[]
-  dispatchPayments DispatchPayment[]
-  expenses         Expense[]
+  payments              OrderPayment[]
+  shiftPayments         ShiftPayment[]
+  dispatchPayments      DispatchPayment[]
+  expenses              Expense[]
+  depositReservations   Reservation[] @relation("ReservationDepositMethod")
+  remainingReservations Reservation[] @relation("ReservationRemainingMethod")
+  refundReservations    Reservation[] @relation("ReservationRefundMethod")
 }
 
 // ─── PRODUCTOS ───────────────────────────────────────────
@@ -103,11 +109,12 @@ model Product {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
-  category      Category?           @relation(fields: [categoryId], references: [id])
-  orderItems    OrderItem[]
-  movements     InventoryMovement[]
-  dispatchItems DispatchItem[]
-  accountItems  AccountItem[]
+  category         Category?           @relation(fields: [categoryId], references: [id])
+  orderItems       OrderItem[]
+  movements        InventoryMovement[]
+  dispatchItems    DispatchItem[]
+  accountItems     AccountItem[]
+  reservationItems ReservationItem[]
 
   @@index([name])
   @@index([barcode])
@@ -129,12 +136,14 @@ model Shift {
   openedAt     DateTime    @default(now())
   closedAt     DateTime?
 
-  user          User           @relation(fields: [userId], references: [id])
-  orders        Order[]
-  shiftPayments ShiftPayment[]
-  subShifts     SubShift[]
-  accounts      Account[]
-  expenses      Expense[]
+  user                  User           @relation(fields: [userId], references: [id])
+  orders                Order[]
+  shiftPayments         ShiftPayment[]
+  subShifts             SubShift[]
+  accounts              Account[]
+  expenses              Expense[]
+  completedReservations Reservation[]  @relation("ReservationCompletedShift")
+  cancelledReservations Reservation[]  @relation("ReservationCancelledShift")
 
   @@index([userId])
   @@index([status])
@@ -352,6 +361,72 @@ model AccountItem {
   @@index([accountId])
 }
 
+// ─── RESERVAS ────────────────────────────────────────────
+
+enum ReservationStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Reservation {
+  id                Int               @id @default(autoincrement())
+  clientName        String
+  clientPhone       String?
+  notes             String?
+  scheduledAt       DateTime
+  totalAmount       Decimal           @db.Decimal(10, 2)
+  depositAmount     Decimal           @db.Decimal(10, 2)
+  depositMethodId   Int
+  status            ReservationStatus @default(PENDING)
+  createdByUserId   Int
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Al completar
+  completedAt        DateTime?
+  completedShiftId   Int?
+  remainingAmount    Decimal?          @db.Decimal(10, 2)
+  remainingMethodId  Int?
+  completedByUserId  Int?
+
+  // Al cancelar
+  cancelledAt        DateTime?
+  cancelledShiftId   Int?
+  refundPct          Int?
+  refundAmount       Decimal?          @db.Decimal(10, 2)
+  refundMethodId     Int?
+  cancelledByUserId  Int?
+
+  createdBy       User           @relation("ReservationCreatedBy",    fields: [createdByUserId],  references: [id])
+  completedBy     User?          @relation("ReservationCompletedBy",  fields: [completedByUserId], references: [id])
+  cancelledBy     User?          @relation("ReservationCancelledBy",  fields: [cancelledByUserId], references: [id])
+  depositMethod   PaymentMethod  @relation("ReservationDepositMethod",  fields: [depositMethodId],  references: [id])
+  remainingMethod PaymentMethod? @relation("ReservationRemainingMethod", fields: [remainingMethodId], references: [id])
+  refundMethod    PaymentMethod? @relation("ReservationRefundMethod",  fields: [refundMethodId],   references: [id])
+  completedShift  Shift?         @relation("ReservationCompletedShift", fields: [completedShiftId], references: [id])
+  cancelledShift  Shift?         @relation("ReservationCancelledShift", fields: [cancelledShiftId], references: [id])
+  items           ReservationItem[]
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdByUserId])
+  @@index([completedShiftId])
+}
+
+model ReservationItem {
+  id            Int     @id @default(autoincrement())
+  reservationId Int
+  productId     Int
+  quantity      Int
+  price         Decimal @db.Decimal(10, 2)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+  product     Product     @relation(fields: [productId],     references: [id])
+
+  @@index([reservationId])
+}
+
 // ─── AUDITORÍA ───────────────────────────────────────────
 
 enum AuditAction {
@@ -381,6 +456,9 @@ enum AuditAction {
   ACCOUNT_ITEM_REMOVE
   EXPENSE_CREATE
   EXPENSE_DELETE
+  RESERVATION_CREATE
+  RESERVATION_COMPLETE
+  RESERVATION_CANCEL
 }
 
 enum AuditEntity {
@@ -394,6 +472,7 @@ enum AuditEntity {
   INVENTORY
   ACCOUNT
   EXPENSE
+  RESERVATION
 }
 
 model AuditLog {

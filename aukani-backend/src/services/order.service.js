@@ -271,6 +271,35 @@ export const orderService = {
       })
     )
 
+    // Desglose por tipo de producto para la tendencia
+    if (orderIds.length > 0) {
+      const typeRows = await prisma.$queryRaw`
+        SELECT o."createdAt"::date AS date,
+               p.type,
+               CAST(SUM(oi.quantity * oi.price) AS FLOAT) AS revenue
+        FROM "Order" o
+        JOIN "OrderItem" oi ON oi."orderId" = o.id
+        JOIN "Product" p ON p.id = oi."productId"
+        WHERE o.id = ANY(${orderIds}::int[])
+        GROUP BY o."createdAt"::date, p.type
+      `
+      const typeMap = {}
+      for (const row of typeRows) {
+        const d = row.date instanceof Date ? row.date.toISOString().split("T")[0] : String(row.date)
+        if (!typeMap[d]) typeMap[d] = { SERVICE: 0, PHYSICAL: 0 }
+        typeMap[d][row.type] = Number(row.revenue)
+      }
+      for (const day of dailyTrend) {
+        day.revenueServices = typeMap[day.date]?.SERVICE ?? 0
+        day.revenueProducts = typeMap[day.date]?.PHYSICAL ?? 0
+      }
+    } else {
+      for (const day of dailyTrend) {
+        day.revenueServices = 0
+        day.revenueProducts = 0
+      }
+    }
+
     // Top productos — raw SQL para calcular revenue correcto (price × quantity)
     let topProducts = []
     if (orderIds.length > 0) {

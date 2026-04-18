@@ -5,7 +5,7 @@ const ip = (req) => req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req
 
 export const productController = {
   async getAll(req, reply) {
-    const { page, limit, search, categoryId, minPrice, maxPrice, lowStock, active } = req.query
+    const { page, limit, search, categoryId, minPrice, maxPrice, lowStock, active, type } = req.query
     const result = await productService.getAll({
       page: Number(page) || 1,
       limit: Number(limit) || 200,
@@ -15,6 +15,7 @@ export const productController = {
       maxPrice: maxPrice || undefined,
       lowStock: lowStock || undefined,
       active: active === "false" ? false : true,
+      type: type || undefined,
     })
     return reply.send(result)
   },

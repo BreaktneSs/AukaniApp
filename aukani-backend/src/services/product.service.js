@@ -11,7 +11,7 @@ function catCode(name) {
 }
 
 export const productService = {
-  async getAll({ page = 1, limit = 200, search, categoryId, minPrice, maxPrice, lowStock, active = true } = {}) {
+  async getAll({ page = 1, limit = 200, search, categoryId, minPrice, maxPrice, lowStock, active = true, type } = {}) {
     const skip = (page - 1) * limit
     const where = { active }
 
@@ -25,6 +25,7 @@ export const productService = {
       ]
     }
 
+    if (type) where.type = type
     if (categoryId) where.categoryId = Number(categoryId)
     if (minPrice !== undefined && minPrice !== "") where.price = { ...where.price, gte: Number(minPrice) }
     if (maxPrice !== undefined && maxPrice !== "") where.price = { ...where.price, lte: Number(maxPrice) }
