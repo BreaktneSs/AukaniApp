@@ -26,6 +26,28 @@ export const shiftService = {
             paymentMethod: { select: { id: true, name: true } },
           },
         },
+        completedReservations: {
+          where: { status: "COMPLETED" },
+          select: {
+            id: true,
+            depositAmount: true,
+            depositMethodId: true,
+            depositMethod:  { select: { id: true, name: true } },
+            remainingAmount: true,
+            remainingMethodId: true,
+            remainingMethod: { select: { id: true, name: true } },
+          },
+        },
+        cancelledReservations: {
+          where: { status: "CANCELLED" },
+          select: {
+            id: true,
+            depositAmount: true,
+            depositMethodId: true,
+            depositMethod:  { select: { id: true, name: true } },
+            refundPct: true,
+          },
+        },
       },
     })
 
@@ -43,6 +65,32 @@ export const shiftService = {
       }
     }
 
+    // Reservas completadas: sumar abono (depositAmount) + restante (remainingAmount) por sus métodos
+    for (const res of shift.completedReservations || []) {
+      if (res.depositMethodId && res.depositAmount) {
+        const id = res.depositMethodId
+        if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.depositMethod }
+        livePaymentTotals[id].total += Number(res.depositAmount)
+      }
+      if (res.remainingMethodId && res.remainingAmount) {
+        const id = res.remainingMethodId
+        if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.remainingMethod }
+        livePaymentTotals[id].total += Number(res.remainingAmount)
+      }
+    }
+
+    // Reservas canceladas: sumar solo la retención (depositAmount × (100 - refundPct) / 100)
+    // El reembolso sale del fondo del abono, nunca estuvo en caja
+    for (const res of shift.cancelledReservations || []) {
+      const retentionPct = 100 - (res.refundPct ?? 0)
+      const retentionAmount = Math.round(Number(res.depositAmount) * retentionPct) / 100
+      if (retentionAmount > 0 && res.depositMethodId) {
+        const id = res.depositMethodId
+        if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.depositMethod }
+        livePaymentTotals[id].total += retentionAmount
+      }
+    }
+
     const liveShiftPayments = Object.entries(livePaymentTotals).map(([id, data]) => ({
       id: `live-${id}`,
       paymentMethodId: Number(id),
@@ -50,7 +98,7 @@ export const shiftService = {
       paymentMethod: data.paymentMethod,
     }))
 
-    const { orders, expenses, ...rest } = shift
+    const { orders, expenses, completedReservations, cancelledReservations, ...rest } = shift
     return { ...rest, shiftPayments: liveShiftPayments, expenses: expenses || [] }
   },
 
@@ -78,6 +126,33 @@ export const shiftService = {
     for (const order of shift.orders) {
       for (const payment of order.payments) {
         paymentTotals[payment.paymentMethodId] = (paymentTotals[payment.paymentMethodId] || 0) + Number(payment.amount)
+      }
+    }
+
+    // Reservas completadas: abono + restante por sus métodos
+    const completedReservations = await prisma.reservation.findMany({
+      where: { completedShiftId: shiftId, status: "COMPLETED" },
+      select: { depositAmount: true, depositMethodId: true, remainingAmount: true, remainingMethodId: true },
+    })
+    for (const res of completedReservations) {
+      if (res.depositMethodId && res.depositAmount) {
+        paymentTotals[res.depositMethodId] = (paymentTotals[res.depositMethodId] || 0) + Number(res.depositAmount)
+      }
+      if (res.remainingMethodId && res.remainingAmount) {
+        paymentTotals[res.remainingMethodId] = (paymentTotals[res.remainingMethodId] || 0) + Number(res.remainingAmount)
+      }
+    }
+
+    // Reservas canceladas: solo la retención entra a caja
+    const cancelledReservations = await prisma.reservation.findMany({
+      where: { cancelledShiftId: shiftId, status: "CANCELLED" },
+      select: { depositAmount: true, depositMethodId: true, refundPct: true },
+    })
+    for (const res of cancelledReservations) {
+      const retentionPct = 100 - (res.refundPct ?? 0)
+      const retentionAmount = Math.round(Number(res.depositAmount) * retentionPct) / 100
+      if (retentionAmount > 0 && res.depositMethodId) {
+        paymentTotals[res.depositMethodId] = (paymentTotals[res.depositMethodId] || 0) + retentionAmount
       }
     }
 
