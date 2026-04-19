@@ -158,6 +158,26 @@ export const useCartStore = create((set, get) => ({
     saveSales(updated, activeId, nextLocalNum)
   },
 
+  updateItemPrice: (productId, newPrice) => {
+    const { sales, activeId, nextLocalNum } = get()
+    const updated = sales.map(s => {
+      if (s.id !== activeId) return s
+      return {
+        ...s,
+        items: s.items.map(i => {
+          if (i.id !== productId) return i
+          return {
+            ...i,
+            price: newPrice,
+            originalPrice: i.originalPrice ?? i.price,
+          }
+        }),
+      }
+    })
+    set({ sales: updated })
+    saveSales(updated, activeId, nextLocalNum)
+  },
+
   clearActive: () => {
     const { sales, activeId, nextLocalNum } = get()
     const updated = sales.map(s => s.id === activeId ? { ...s, items: [] } : s)

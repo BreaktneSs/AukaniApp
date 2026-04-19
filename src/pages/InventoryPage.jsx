@@ -4,7 +4,9 @@ import { inventoryService } from "@/services/inventory.service"
 import { productsService } from "@/services/products.service"
 import { categoriesService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
+import { useUiStore } from "@/store/ui.store"
 import { formatCOP } from "@/utils/currency"
+import NumPad from "@/components/ui/NumPad"
 import {
   Plus, Minus, Loader2, Package, X, ChevronRight,
   TrendingUp, ShoppingCart, AlertTriangle, Search,
@@ -102,7 +104,7 @@ function ImageUploader({ currentUrl, productId, onUploaded }) {
 function ProductModal({ product, categories, onClose, onSave }) {
   const isNew = !product
   const [form, setForm] = useState({
-    name: product?.name || "", price: product?.price || "", cost: product?.cost || "",
+    name: product?.name || "", price: product?.price ? String(Math.round(Number(product.price))) : "", cost: product?.cost ? String(Math.round(Number(product.cost))) : "",
     type: product?.type || "PHYSICAL",
     stock: product?.stock || 0, minStock: product?.minStock || 0,
     barcode: product?.barcode || "", sku: product?.sku || "", categoryId: product?.categoryId || "",
@@ -185,8 +187,24 @@ function ProductModal({ product, categories, onClose, onSave }) {
           <ImageUploader currentUrl={product?.imageUrl} productId={product?.id} onUploaded={v => setPendingImage(v instanceof File ? v : null)} />
           {field("Nombre *", "name", "text", { required: true, autoFocus: true })}
           <div className="grid grid-cols-2 gap-3">
-            {field("Precio *", "price", "number", { required: true, min: 0, step: "1" })}
-            {field("Costo", "cost", "number", { min: 0, step: "1" })}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Precio *</label>
+              <input
+                type="text" inputMode="numeric" required className="input"
+                placeholder="0"
+                value={form.price ? new Intl.NumberFormat("es-CO").format(Number(form.price)) : ""}
+                onChange={e => setForm(f => ({ ...f, price: e.target.value.replace(/\D/g, "") }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Costo</label>
+              <input
+                type="text" inputMode="numeric" className="input"
+                placeholder="0"
+                value={form.cost ? new Intl.NumberFormat("es-CO").format(Number(form.cost)) : ""}
+                onChange={e => setForm(f => ({ ...f, cost: e.target.value.replace(/\D/g, "") }))}
+              />
+            </div>
           </div>
           {!isService && (
             <div className="grid grid-cols-2 gap-3">
@@ -264,7 +282,10 @@ function ProductModal({ product, categories, onClose, onSave }) {
 // ── Modal entrada/salida ──────────────────────────────────
 function MovementModal({ type, products, prefilledId, onClose, onSave }) {
   const isEntry = type === "ENTRY"
+  const { touchMode } = useUiStore()
   const [form, setForm] = useState({ productId: prefilledId ? String(prefilledId) : "", quantity: 1, reason: "" })
+  const [numPad, setNumPad] = useState(false)
+  const selectedProduct = products.find(p => String(p.id) === String(form.productId))
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
       <div className="card p-6 w-full max-w-sm animate-slide-up" onClick={e => e.stopPropagation()}>
@@ -279,7 +300,26 @@ function MovementModal({ type, products, prefilledId, onClose, onSave }) {
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Cantidad *</label>
-            <input type="number" className="input" min={1} required value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} />
+            {touchMode ? (
+              <button type="button"
+                onClick={() => setNumPad(true)}
+                className="input text-left font-mono font-bold flex items-center justify-between"
+                style={{ color: "var(--brand)" }}>
+                <span>{form.quantity}</span>
+                <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>Toca para editar</span>
+              </button>
+            ) : (
+              <input
+                type="text" inputMode="numeric" className="input font-mono" min={1} required
+                value={form.quantity}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, "")
+                  setForm(f => ({ ...f, quantity: val === "" ? "" : Math.max(1, Number(val)) }))
+                }}
+                onBlur={() => setForm(f => ({ ...f, quantity: Math.max(1, Number(f.quantity) || 1) }))}
+                onClick={e => e.target.select()}
+              />
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Motivo</label>
@@ -291,6 +331,14 @@ function MovementModal({ type, products, prefilledId, onClose, onSave }) {
           </div>
         </form>
       </div>
+      {numPad && (
+        <NumPad
+          initialValue={Number(form.quantity) || 1}
+          label={selectedProduct?.name || "Cantidad"}
+          onConfirm={val => { setForm(f => ({ ...f, quantity: val })); setNumPad(false) }}
+          onClose={() => setNumPad(false)}
+        />
+      )}
     </div>
   )
 }

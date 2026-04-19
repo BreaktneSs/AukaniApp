@@ -14,10 +14,59 @@ import NumPad from "@/components/ui/NumPad"
 import {
   Search, X, Plus, Minus, Trash2, ShoppingCart,
   CreditCard, Banknote, Loader2, Package,
-  PlusCircle, LogIn, LogOut, Bell, User, UserPlus, AlertTriangle,
+  PlusCircle, LogIn, LogOut, Bell, User, UserPlus, AlertTriangle, Pencil,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { formatCOP, formatNumber } from "@/utils/currency"
+
+// ── Modal edición de precio de servicio ───────────────────
+function PriceEditModal({ item, onConfirm, onClose }) {
+  const catalogPrice = Number(item.originalPrice ?? item.price)
+  const [raw, setRaw] = useState(String(Math.round(Number(item.price))))
+  const numValue = Number(raw) || 0
+  const display = raw ? formatNumber(numValue) : ""
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}>
+      <div className="card w-full max-w-xs animate-slide-up p-5 space-y-4"
+        onClick={e => e.stopPropagation()}>
+        <div>
+          <p className="font-display font-bold text-sm" style={{ color: "var(--text-primary)" }}>
+            Ajustar precio
+          </p>
+          <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{item.name}</p>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+            Precio catálogo: <span className="font-mono font-semibold">{formatCOP(catalogPrice)}</span>
+          </p>
+        </div>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-lg"
+            style={{ color: "var(--text-muted)" }}>$</span>
+          <input
+            type="text" inputMode="numeric" autoFocus
+            className="input pl-8 text-xl font-mono font-bold text-right"
+            placeholder="0"
+            value={display}
+            onChange={e => setRaw(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={e => { if (e.key === "Enter" && numValue > 0) onConfirm(numValue) }}
+          />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+          <button
+            onClick={() => numValue > 0 && onConfirm(numValue)}
+            disabled={numValue <= 0}
+            className="btn-md flex-1 font-semibold"
+            style={{ background: "var(--brand)", color: "#fff", opacity: numValue <= 0 ? 0.5 : 1 }}>
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── (ImgPlaceholder inlined in ProductCard) ──────────────
 
@@ -65,7 +114,7 @@ function ProductCard({ product, onAdd }) {
 }
 
 // ── CartItem ──────────────────────────────────────────────
-function CartItem({ item, onUpdate, onRemove, onEditQty }) {
+function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
   const [raw, setRaw] = useState(String(item.quantity))
   useEffect(() => { setRaw(String(item.quantity)) }, [item.quantity])
 
@@ -75,11 +124,32 @@ function CartItem({ item, onUpdate, onRemove, onEditQty }) {
     else setRaw(String(item.quantity))
   }
 
+  const priceAltered = item.originalPrice != null && Number(item.originalPrice) !== Number(item.price)
+
   return (
     <div className="flex items-center gap-2 py-2.5 border-b animate-fade-in" style={{ borderColor: "var(--border)" }}>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
-        <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{formatCOP(item.price)}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-mono" style={{ color: priceAltered ? "var(--brand)" : "var(--text-muted)" }}>
+            {formatCOP(item.price)}
+          </p>
+          {priceAltered && (
+            <p className="text-xs font-mono line-through" style={{ color: "var(--text-muted)" }}>
+              {formatCOP(item.originalPrice)}
+            </p>
+          )}
+          {item.type === "SERVICE" && onEditPrice && (
+            <button
+              type="button"
+              onClick={() => onEditPrice(item)}
+              className="w-4 h-4 flex items-center justify-center rounded btn-ghost"
+              style={{ color: priceAltered ? "var(--brand)" : "var(--text-muted)" }}
+              title="Ajustar precio">
+              <Pencil size={10} />
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button onClick={() => onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
@@ -524,12 +594,13 @@ export default function POSPage() {
   const [confirmCloseAccount, setConfirmCloseAccount] = useState(null)
   const [payments, setPayments] = useState([])
   const [numPad, setNumPad] = useState(null) // { id, value, label }
+  const [priceEdit, setPriceEdit] = useState(null) // item being price-edited
   const { touchMode } = useUiStore()
   const searchRef = useRef(null)
   const qc = useQueryClient()
 
   const navigate = useNavigate()
-  const { sales, activeId, shiftId, resetForNewShift, newSale, newAccount, switchSale, closeSale, addItem, removeItem, updateQuantity, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems } = useCartStore()
+  const { sales, activeId, shiftId, resetForNewShift, newSale, newAccount, switchSale, closeSale, addItem, removeItem, updateQuantity, updateItemPrice, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems } = useCartStore()
   const active = getActive()
   const items = active?.items || []
   const remoteItems = active?.type === "account" ? (active?.remoteItems || []) : []
@@ -722,7 +793,11 @@ export default function POSPage() {
     const paid = payments.reduce((s, p) => s + (p.amount || 0), 0)
     if (paid < total) { toast.error(`Falta ${formatCOP(total - paid)} por pagar`); return }
     const allItems = [
-      ...items.map(i => ({ productId: i.id, quantity: i.quantity })),
+      ...items.map(i => ({
+        productId: i.id,
+        quantity: i.quantity,
+        ...(i.originalPrice != null && { customPrice: i.price }),
+      })),
       ...remoteItems.map(i => ({ productId: i.id, quantity: i.quantity })),
     ]
     createSale({
@@ -879,6 +954,7 @@ export default function POSPage() {
                     {items.map(item => (
                       <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem}
                         onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
+                        onEditPrice={(it) => setPriceEdit(it)}
                       />
                     ))}
                   </>
@@ -1066,6 +1142,14 @@ export default function POSPage() {
           label={numPad.label}
           onConfirm={(val) => { updateQuantity(numPad.id, val); setNumPad(null) }}
           onClose={() => setNumPad(null)}
+        />
+      )}
+
+      {priceEdit && (
+        <PriceEditModal
+          item={priceEdit}
+          onConfirm={(newPrice) => { updateItemPrice(priceEdit.id, newPrice); setPriceEdit(null) }}
+          onClose={() => setPriceEdit(null)}
         />
       )}
     </div>
