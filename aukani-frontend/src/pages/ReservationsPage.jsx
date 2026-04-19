@@ -4,6 +4,8 @@ import { reservationsService } from "@/services/reservations.service"
 import { shiftsService } from "@/services/shifts.service"
 import { paymentMethodsService } from "@/services/catalog.service"
 import { productsService } from "@/services/products.service"
+import { useUiStore } from "@/store/ui.store"
+import NumPad from "@/components/ui/NumPad"
 import {
   CalendarDays, Plus, X, Check, Ban, Loader2,
   Phone, Clock, ChevronLeft, ChevronRight, Search, Minus
@@ -50,14 +52,21 @@ function ModalHeader({ title, subtitle, onClose }) {
 // ── Crear reserva ──────────────────────────────────────────
 function CreateModal({ onClose, paymentMethods }) {
   const qc = useQueryClient()
+  const { touchMode } = useUiStore()
   const [form, setForm] = useState({
     clientName: "", clientPhone: "", notes: "",
     scheduledAt: "", depositAmount: "", depositMethodId: null,
   })
   const [cartItems, setCartItems] = useState([]) // [{product, quantity}]
   const [search, setSearch] = useState("")
+  const [numPad, setNumPad] = useState(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const setQty = (productId, qty) => {
+    if (qty <= 0) setCartItems(prev => prev.filter(i => i.product.id !== productId))
+    else setCartItems(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: qty } : i))
+  }
 
   const { data: serviceProducts = [] } = useQuery({
     queryKey: ["products", "SERVICE"],
@@ -177,7 +186,31 @@ function CreateModal({ onClose, paymentMethods }) {
                     className="w-5 h-5 rounded flex items-center justify-center btn-ghost" style={{ color: "var(--danger)" }}>
                     <Minus size={11} />
                   </button>
-                  <span className="w-5 text-center text-xs font-bold" style={{ color: "var(--text-primary)" }}>{item.quantity}</span>
+                  {touchMode ? (
+                    <span
+                      className="w-6 text-center text-xs font-bold font-mono cursor-pointer rounded"
+                      style={{ color: "var(--brand)", background: "var(--brand-light)", padding: "2px 4px" }}
+                      onClick={() => setNumPad({ productId: item.product.id, value: item.quantity, label: item.product.name })}
+                    >{item.quantity}</span>
+                  ) : (
+                    <input
+                      type="text" inputMode="numeric"
+                      value={item.quantity}
+                      onChange={e => {
+                        const val = parseInt(e.target.value.replace(/\D/g, ""), 10)
+                        if (!isNaN(val)) setQty(item.product.id, val)
+                      }}
+                      onBlur={e => { if (!parseInt(e.target.value, 10)) setQty(item.product.id, 1) }}
+                      className="font-mono font-bold text-xs text-center rounded"
+                      style={{
+                        width: "1.75rem", height: "1.5rem",
+                        background: "var(--bg-tertiary)",
+                        border: "1.5px solid var(--border)",
+                        color: "var(--text-primary)", outline: "none",
+                      }}
+                      onClick={e => e.target.select()}
+                    />
+                  )}
                   <button type="button" onClick={() => changeQty(item.product.id, 1)}
                     className="w-5 h-5 rounded flex items-center justify-center btn-ghost" style={{ color: "var(--brand)" }}>
                     <Plus size={11} />
@@ -196,7 +229,9 @@ function CreateModal({ onClose, paymentMethods }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Abono inicial *</label>
-            <input type="number" style={inputStyle} placeholder="0" min={0} required value={form.depositAmount} onChange={e => set("depositAmount", e.target.value)} />
+            <input type="text" inputMode="numeric" style={inputStyle} placeholder="0" required
+              value={form.depositAmount ? new Intl.NumberFormat("es-CO").format(Number(form.depositAmount)) : ""}
+              onChange={e => set("depositAmount", e.target.value.replace(/\D/g, ""))} />
           </div>
           {form.depositAmount && totalAmount > 0 && (
             <div className="flex items-end pb-1">
@@ -236,6 +271,14 @@ function CreateModal({ onClose, paymentMethods }) {
           </button>
         </div>
       </form>
+      {numPad && (
+        <NumPad
+          initialValue={numPad.value}
+          label={numPad.label}
+          onConfirm={val => { setQty(numPad.productId, val); setNumPad(null) }}
+          onClose={() => setNumPad(null)}
+        />
+      )}
     </Modal>
   )
 }

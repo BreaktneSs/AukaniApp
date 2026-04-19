@@ -18,8 +18,21 @@ export const orderService = {
         const isService = product.type === "SERVICE"
         if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }
 
-        total += Number(product.price) * item.quantity
-        orderItems.push({ productId: product.id, quantity: item.quantity, price: product.price })
+        const customPrice = isService && item.customPrice != null && Number(item.customPrice) > 0
+          ? Number(item.customPrice)
+          : null
+        const effectivePrice = customPrice ?? Number(product.price)
+        const originalPrice  = customPrice !== null && customPrice !== Number(product.price)
+          ? Number(product.price)
+          : null
+
+        total += effectivePrice * item.quantity
+        orderItems.push({
+          productId: product.id,
+          quantity: item.quantity,
+          price: effectivePrice,
+          ...(originalPrice !== null && { originalPrice }),
+        })
 
         if (!isService) {
           await tx.product.update({ where: { id: product.id }, data: { stock: { decrement: item.quantity } } })
@@ -182,10 +195,24 @@ export const orderService = {
     if (userId) where.userId = userId
     if (shiftId) where.shiftId = shiftId
 
-    const [orders, total] = await Promise.all([
-      prisma.order.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" }, include: { user: { select: { id: true, name: true } }, payments: { include: { paymentMethod: true } }, _count: { select: { items: true } } } }),
+    const [raw, total] = await Promise.all([
+      prisma.order.findMany({
+        where, skip, take: limit, orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { id: true, name: true } },
+          payments: { include: { paymentMethod: true } },
+          _count: { select: { items: true } },
+          items: { where: { originalPrice: { not: null } }, select: { id: true }, take: 1 },
+        },
+      }),
       prisma.order.count({ where }),
     ])
+
+    const orders = raw.map(({ items, ...o }) => ({
+      ...o,
+      hasAdjustedPrices: items.length > 0,
+    }))
+
     return { orders, total, page, limit }
   },
 

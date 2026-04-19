@@ -254,7 +254,7 @@ function SendOrderPanel({ items, total, subShiftId, onSent, onCancel }) {
       {payments.map((row, idx) => {
         const usedIds = payments.filter(p => p.paymentMethodId !== row.paymentMethodId).map(p => p.paymentMethodId)
         const availableMethods = paymentMethods.filter(m => m.active && (m.id === row.paymentMethodId || !usedIds.includes(m.id)))
-        const displayAmt = row.rawAmount ? new Intl.NumberFormat("es-CO").format(Number(row.rawAmount)) : ""
+        const displayAmt = row.rawAmount ? formatNumber(Number(row.rawAmount)) : ""
         return (
           <div key={row.paymentMethodId} className="flex items-center gap-1.5">
             <select

@@ -2,7 +2,9 @@ import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ordersService } from "@/services/orders.service"
 import { paymentMethodsService } from "@/services/catalog.service"
-import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react"
+import { useUiStore } from "@/store/ui.store"
+import NumPad from "@/components/ui/NumPad"
+import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus, AlertTriangle } from "lucide-react"
 import { confirm } from "@/components/ui/ConfirmDialog"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
@@ -27,9 +29,18 @@ function OrderDetail({ order, onClose, onRefund }) {
           <h2 className="font-display font-bold text-lg" style={{ color: "var(--text-primary)" }}>
             Venta #{order.id}
           </h2>
-          <span className="badge text-xs" style={{ background: STATUS[order.status]?.bg, color: STATUS[order.status]?.color }}>
-            {STATUS[order.status]?.label}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="badge text-xs" style={{ background: STATUS[order.status]?.bg, color: STATUS[order.status]?.color }}>
+              {STATUS[order.status]?.label}
+            </span>
+            {order.items?.some(i => i.originalPrice != null) && (
+              <span className="badge text-xs flex items-center gap-1"
+                style={{ background: "var(--warning-light)", color: "var(--warning)" }}>
+                <AlertTriangle size={10} />
+                Ajustada
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Items */}
@@ -37,6 +48,7 @@ function OrderDetail({ order, onClose, onRefund }) {
           {order.items?.map(item => {
             const returned = item.refundedQty > 0
             const fullyReturned = item.refundedQty >= item.quantity
+            const priceAltered = item.originalPrice != null && Number(item.originalPrice) !== Number(item.price)
             return (
               <div key={item.id} className="rounded-md px-2 py-1.5" style={{ background: returned ? "var(--warning-light)" : "transparent" }}>
                 <div className="flex justify-between text-sm">
@@ -50,6 +62,14 @@ function OrderDetail({ order, onClose, onRefund }) {
                     {formatCOP(Number(item.price) * item.quantity)}
                   </span>
                 </div>
+                {priceAltered && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)", textDecoration: "line-through" }}>
+                      {formatCOP(Number(item.originalPrice))} c/u cat.
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--brand)" }}>precio ajustado</span>
+                  </div>
+                )}
                 {returned && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <RotateCcw size={10} style={{ color: "var(--warning)" }} />
@@ -111,6 +131,7 @@ function OrderDetail({ order, onClose, onRefund }) {
 
 // ── Refund modal ──────────────────────────────────────────────────────────────
 function RefundModal({ order, onClose, onConfirm, isLoading, paymentMethods }) {
+  const { touchMode } = useUiStore()
   // Only items that still have remaining quantity to return
   const refundableItems = useMemo(
     () => order.items.filter(i => (i.refundedQty ?? 0) < i.quantity),
@@ -119,6 +140,7 @@ function RefundModal({ order, onClose, onConfirm, isLoading, paymentMethods }) {
 
   const [selection, setSelection] = useState({})
   const [refundPaymentMethodId, setRefundPaymentMethodId] = useState(null)
+  const [numPad, setNumPad] = useState(null)
 
   const remaining = (item) => item.quantity - (item.refundedQty ?? 0)
 
@@ -229,13 +251,22 @@ function RefundModal({ order, onClose, onConfirm, isLoading, paymentMethods }) {
                       style={{ background: "var(--bg-secondary)", color: "var(--text-primary)" }}>
                       <Minus size={10} />
                     </button>
-                    <input
-                      type="number" min={1} max={max}
-                      value={selection[item.id] || 1}
-                      onChange={e => setQty(item.id, e.target.value)}
-                      className="w-10 text-center text-sm rounded border font-mono"
-                      style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)" }}
-                    />
+                    {touchMode ? (
+                      <span
+                        className="w-10 text-center text-sm font-mono font-bold cursor-pointer rounded"
+                        style={{ color: "var(--brand)", background: "var(--brand-light)", padding: "3px 4px" }}
+                        onClick={() => setNumPad({ itemId: item.id, value: selection[item.id] || 1, max, label: item.product?.name })}
+                      >{selection[item.id] || 1}</span>
+                    ) : (
+                      <input
+                        type="text" inputMode="numeric" min={1} max={max}
+                        value={selection[item.id] || 1}
+                        onChange={e => setQty(item.id, e.target.value.replace(/\D/g, ""))}
+                        className="w-10 text-center text-sm rounded border font-mono"
+                        style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                        onClick={e => e.target.select()}
+                      />
+                    )}
                     <button onClick={() => setQty(item.id, (selection[item.id] || 1) + 1)}
                       className="w-6 h-6 rounded flex items-center justify-center"
                       style={{ background: "var(--bg-secondary)", color: "var(--text-primary)" }}>
@@ -311,6 +342,14 @@ function RefundModal({ order, onClose, onConfirm, isLoading, paymentMethods }) {
           </button>
         </div>
       </div>
+      {numPad && (
+        <NumPad
+          initialValue={numPad.value}
+          label={numPad.label}
+          onConfirm={val => { setQty(numPad.itemId, val); setNumPad(null) }}
+          onClose={() => setNumPad(null)}
+        />
+      )}
     </div>
   )
 }
@@ -398,10 +437,20 @@ export default function SalesPage() {
                         {formatCOP(o.total)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="badge text-xs"
-                          style={{ background: STATUS[o.status]?.bg, color: STATUS[o.status]?.color }}>
-                          {STATUS[o.status]?.label}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="badge text-xs"
+                            style={{ background: STATUS[o.status]?.bg, color: STATUS[o.status]?.color }}>
+                            {STATUS[o.status]?.label}
+                          </span>
+                          {o.hasAdjustedPrices && (
+                            <span className="badge text-xs flex items-center gap-1"
+                              style={{ background: "var(--warning-light)", color: "var(--warning)" }}
+                              title="Contiene servicios con precio ajustado">
+                              <AlertTriangle size={10} />
+                              Ajustada
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1 justify-end">

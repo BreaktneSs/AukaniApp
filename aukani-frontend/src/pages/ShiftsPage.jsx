@@ -371,11 +371,11 @@ function ExpensesTab() {
           />
 
           <input
-            type="number"
-            placeholder="Monto"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            min={1}
+            type="text"
+            inputMode="numeric"
+            placeholder="0"
+            value={amount ? new Intl.NumberFormat("es-CO").format(Number(amount)) : ""}
+            onChange={e => setAmount(e.target.value.replace(/\D/g, ""))}
             className="w-full rounded-lg px-3 py-2 text-sm font-mono outline-none transition-colors"
             style={{
               background: "var(--bg-primary)",
