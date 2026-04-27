@@ -18,7 +18,7 @@ export const orderService = {
         const isService = product.type === "SERVICE"
         if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }
 
-        const customPrice = isService && item.customPrice != null && Number(item.customPrice) > 0
+        const customPrice = item.customPrice != null && Number(item.customPrice) > 0
           ? Number(item.customPrice)
           : null
         const effectivePrice = customPrice ?? Number(product.price)
@@ -32,6 +32,7 @@ export const orderService = {
           quantity: item.quantity,
           price: effectivePrice,
           ...(originalPrice !== null && { originalPrice }),
+          ...(originalPrice !== null && item.priceNote && { priceNote: item.priceNote }),
         })
 
         if (!isService) {
