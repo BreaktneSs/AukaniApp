@@ -21,10 +21,24 @@ import { formatCOP, formatNumber } from "@/utils/currency"
 
 // ── Modal edición de precio de servicio ───────────────────
 function PriceEditModal({ item, onConfirm, onClose }) {
+  const { touchMode } = useUiStore()
   const catalogPrice = Number(item.originalPrice ?? item.price)
   const [raw, setRaw] = useState(String(Math.round(Number(item.price))))
   const numValue = Number(raw) || 0
   const display = raw ? formatNumber(numValue) : ""
+
+  if (touchMode) {
+    return (
+      <NumPad
+        mode="currency"
+        initialValue={Math.round(Number(item.price))}
+        label={item.name}
+        subtitle={`Catálogo: ${formatCOP(catalogPrice)}`}
+        onConfirm={(val) => val > 0 && onConfirm(val)}
+        onClose={onClose}
+      />
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"

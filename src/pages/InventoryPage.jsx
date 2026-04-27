@@ -103,6 +103,8 @@ function ImageUploader({ currentUrl, productId, onUploaded }) {
 // ── Modal crear/editar producto ───────────────────────────
 function ProductModal({ product, categories, onClose, onSave }) {
   const isNew = !product
+  const { touchMode } = useUiStore()
+  const [priceNumPad, setPriceNumPad] = useState(null) // "price" | "cost" | null
   const [form, setForm] = useState({
     name: product?.name || "", price: product?.price ? String(Math.round(Number(product.price))) : "", cost: product?.cost ? String(Math.round(Number(product.cost))) : "",
     type: product?.type || "PHYSICAL",
@@ -187,24 +189,28 @@ function ProductModal({ product, categories, onClose, onSave }) {
           <ImageUploader currentUrl={product?.imageUrl} productId={product?.id} onUploaded={v => setPendingImage(v instanceof File ? v : null)} />
           {field("Nombre *", "name", "text", { required: true, autoFocus: true })}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Precio *</label>
-              <input
-                type="text" inputMode="numeric" required className="input"
-                placeholder="0"
-                value={form.price ? new Intl.NumberFormat("es-CO").format(Number(form.price)) : ""}
-                onChange={e => setForm(f => ({ ...f, price: e.target.value.replace(/\D/g, "") }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Costo</label>
-              <input
-                type="text" inputMode="numeric" className="input"
-                placeholder="0"
-                value={form.cost ? new Intl.NumberFormat("es-CO").format(Number(form.cost)) : ""}
-                onChange={e => setForm(f => ({ ...f, cost: e.target.value.replace(/\D/g, "") }))}
-              />
-            </div>
+            {[
+              { key: "price", label: "Precio *", required: true },
+              { key: "cost",  label: "Costo",    required: false },
+            ].map(({ key, label, required }) => (
+              <div key={key}>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{label}</label>
+                {touchMode ? (
+                  <button type="button" className="input w-full text-left font-mono"
+                    style={{ color: form[key] ? "var(--text-primary)" : "var(--text-muted)" }}
+                    onClick={() => setPriceNumPad(key)}>
+                    {form[key] ? new Intl.NumberFormat("es-CO").format(Number(form[key])) : "0"}
+                  </button>
+                ) : (
+                  <input
+                    type="text" inputMode="numeric" required={required} className="input"
+                    placeholder="0"
+                    value={form[key] ? new Intl.NumberFormat("es-CO").format(Number(form[key])) : ""}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value.replace(/\D/g, "") }))}
+                  />
+                )}
+              </div>
+            ))}
           </div>
           {!isService && (
             <div className="grid grid-cols-2 gap-3">
@@ -275,6 +281,15 @@ function ProductModal({ product, categories, onClose, onSave }) {
           </div>
         </form>
       </div>
+      {priceNumPad && (
+        <NumPad
+          mode="currency"
+          initialValue={Number(form[priceNumPad]) || 0}
+          label={priceNumPad === "price" ? "Precio" : "Costo"}
+          onConfirm={(val) => { setForm(f => ({ ...f, [priceNumPad]: String(val) })); setPriceNumPad(null) }}
+          onClose={() => setPriceNumPad(null)}
+        />
+      )}
     </div>
   )
 }
