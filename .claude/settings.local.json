@@ -4,7 +4,8 @@
       "Bash(npx prisma *)",
       "Bash(npx kill-port *)",
       "Bash(node_modules/.bin/prisma migrate *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(python -c ' *)"
     ]
   }
 }

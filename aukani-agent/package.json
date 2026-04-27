@@ -8,10 +8,10 @@
   "scripts": {
     "start": "node src/agent.js",
     "dev": "nodemon src/agent.js",
-    "build:win": "pkg . --target node18-win-x64 --output dist/aukani-agent-windows.exe",
-    "build:linux": "pkg . --target node18-linux-x64 --output dist/aukani-agent-linux",
-    "build:mac": "pkg . --target node18-macos-x64 --output dist/aukani-agent-mac",
-    "build:all": "pkg . --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist/"
+    "build:win": "pkg . --target node20-win-x64 --output dist/aukani-agent-windows.exe",
+    "build:linux": "pkg . --target node20-linux-x64 --output dist/aukani-agent-linux",
+    "build:mac": "pkg . --target node20-macos-x64 --output dist/aukani-agent-mac",
+    "build:all": "pkg . --targets node20-win-x64,node20-linux-x64 --out-path dist/"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -19,15 +19,15 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.0",
-    "pkg": "^5.8.1"
+    "@yao-pkg/pkg": "^5.12.0"
   },
   "pkg": {
     "assets": [
       "src/**/*"
     ],
     "targets": [
-      "node18-win-x64",
-      "node18-linux-x64"
+      "node20-win-x64",
+      "node20-linux-x64"
     ],
     "outputPath": "dist"
   }
