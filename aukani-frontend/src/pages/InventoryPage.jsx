@@ -267,7 +267,17 @@ function ProductModal({ product, categories, onClose, onSave }) {
             </p>
           </div>
 
-          {!isService && field("Código de barras", "barcode")}
+          {!isService && (
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Código de barras</label>
+              <input
+                type="text" className="input"
+                value={form.barcode}
+                onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                onKeyDown={e => { if (e.key === "Enter") e.preventDefault() }}
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Categoría</label>
             <select className="input" value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}>

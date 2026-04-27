@@ -207,6 +207,7 @@ model OrderItem {
   quantity      Int
   price         Decimal  @db.Decimal(10, 2)
   originalPrice Decimal? @db.Decimal(10, 2)
+  priceNote     String?
   refundedQty   Int      @default(0)
 
   order   Order   @relation(fields: [orderId], references: [id])

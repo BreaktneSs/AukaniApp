@@ -158,7 +158,7 @@ export const useCartStore = create((set, get) => ({
     saveSales(updated, activeId, nextLocalNum)
   },
 
-  updateItemPrice: (productId, newPrice) => {
+  updateItemPrice: (productId, newPrice, note) => {
     const { sales, activeId, nextLocalNum } = get()
     const updated = sales.map(s => {
       if (s.id !== activeId) return s
@@ -170,6 +170,7 @@ export const useCartStore = create((set, get) => ({
             ...i,
             price: newPrice,
             originalPrice: i.originalPrice ?? i.price,
+            priceNote: note || undefined,
           }
         }),
       }
