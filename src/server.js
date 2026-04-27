@@ -1,4 +1,5 @@
-import "dotenv/config"
+import dotenv from "dotenv"
+if (!process.env.DATABASE_URL) dotenv.config()
 import Fastify from "fastify"
 import cors from "@fastify/cors"
 import rateLimit from "@fastify/rate-limit"
