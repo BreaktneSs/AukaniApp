@@ -24,19 +24,55 @@ function PriceEditModal({ item, onConfirm, onClose }) {
   const { touchMode } = useUiStore()
   const catalogPrice = Number(item.originalPrice ?? item.price)
   const [raw, setRaw] = useState(String(Math.round(Number(item.price))))
+  const [note, setNote] = useState(item.priceNote || "")
+  const [step, setStep] = useState("price") // "price" | "note" (touch mode)
   const numValue = Number(raw) || 0
   const display = raw ? formatNumber(numValue) : ""
 
+  const handleConfirm = () => { if (numValue > 0) onConfirm(numValue, note.trim()) }
+
+  // Touch mode: dos pasos — primero precio, luego motivo
   if (touchMode) {
+    if (step === "price") {
+      return (
+        <NumPad
+          mode="currency"
+          initialValue={Math.round(Number(item.price))}
+          label={item.name}
+          subtitle={`Catálogo: ${formatCOP(catalogPrice)}`}
+          onConfirm={(val) => { if (val > 0) { setRaw(String(val)); setStep("note") } }}
+          onClose={onClose}
+        />
+      )
+    }
     return (
-      <NumPad
-        mode="currency"
-        initialValue={Math.round(Number(item.price))}
-        label={item.name}
-        subtitle={`Catálogo: ${formatCOP(catalogPrice)}`}
-        onConfirm={(val) => val > 0 && onConfirm(val)}
-        onClose={onClose}
-      />
+      <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
+        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
+        onClick={onClose}>
+        <div className="card w-full max-w-[320px] rounded-b-none sm:rounded-2xl animate-slide-up p-5 space-y-4"
+          onClick={e => e.stopPropagation()}>
+          <div>
+            <p className="font-display font-bold text-sm" style={{ color: "var(--text-primary)" }}>Motivo del ajuste</p>
+            <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{item.name} → {formatCOP(numValue)}</p>
+          </div>
+          <textarea
+            autoFocus rows={3}
+            className="input w-full resize-none text-sm"
+            placeholder="Ej: descuento cliente frecuente, promoción del día..."
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button
+              onClick={() => onConfirm(numValue, note.trim())}
+              className="btn-md flex-1 font-semibold"
+              style={{ background: "var(--brand)", color: "#fff" }}>
+              Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -52,7 +88,7 @@ function PriceEditModal({ item, onConfirm, onClose }) {
           </p>
           <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{item.name}</p>
           <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-            Precio catálogo: <span className="font-mono font-semibold">{formatCOP(catalogPrice)}</span>
+            Catálogo: <span className="font-mono font-semibold">{formatCOP(catalogPrice)}</span>
           </p>
         </div>
         <div className="relative">
@@ -64,13 +100,27 @@ function PriceEditModal({ item, onConfirm, onClose }) {
             placeholder="0"
             value={display}
             onChange={e => setRaw(e.target.value.replace(/\D/g, ""))}
-            onKeyDown={e => { if (e.key === "Enter" && numValue > 0) onConfirm(numValue) }}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("price-note-input")?.focus() } }}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+            Motivo <span style={{ color: "var(--text-muted)" }}>(opcional)</span>
+          </label>
+          <input
+            id="price-note-input"
+            type="text"
+            className="input text-sm"
+            placeholder="Ej: descuento cliente frecuente..."
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") handleConfirm() }}
           />
         </div>
         <div className="flex gap-2">
           <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
           <button
-            onClick={() => numValue > 0 && onConfirm(numValue)}
+            onClick={handleConfirm}
             disabled={numValue <= 0}
             className="btn-md flex-1 font-semibold"
             style={{ background: "var(--brand)", color: "#fff", opacity: numValue <= 0 ? 0.5 : 1 }}>
@@ -153,7 +203,7 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
               {formatCOP(item.originalPrice)}
             </p>
           )}
-          {item.type === "SERVICE" && onEditPrice && (
+          {onEditPrice && (
             <button
               type="button"
               onClick={() => onEditPrice(item)}
@@ -811,6 +861,7 @@ export default function POSPage() {
         productId: i.id,
         quantity: i.quantity,
         ...(i.originalPrice != null && { customPrice: i.price }),
+        ...(i.priceNote && { priceNote: i.priceNote }),
       })),
       ...remoteItems.map(i => ({ productId: i.id, quantity: i.quantity })),
     ]
@@ -1162,7 +1213,7 @@ export default function POSPage() {
       {priceEdit && (
         <PriceEditModal
           item={priceEdit}
-          onConfirm={(newPrice) => { updateItemPrice(priceEdit.id, newPrice); setPriceEdit(null) }}
+          onConfirm={(newPrice, note) => { updateItemPrice(priceEdit.id, newPrice, note); setPriceEdit(null) }}
           onClose={() => setPriceEdit(null)}
         />
       )}

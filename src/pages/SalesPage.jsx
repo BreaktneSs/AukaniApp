@@ -63,11 +63,18 @@ function OrderDetail({ order, onClose, onRefund }) {
                   </span>
                 </div>
                 {priceAltered && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)", textDecoration: "line-through" }}>
-                      {formatCOP(Number(item.originalPrice))} c/u cat.
-                    </span>
-                    <span className="text-xs font-semibold" style={{ color: "var(--brand)" }}>precio ajustado</span>
+                  <div className="flex flex-col gap-0.5 mt-0.5">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)", textDecoration: "line-through" }}>
+                        {formatCOP(Number(item.originalPrice))} c/u cat.
+                      </span>
+                      <span className="text-xs font-semibold" style={{ color: "var(--brand)" }}>precio ajustado</span>
+                    </div>
+                    {item.priceNote && (
+                      <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
+                        "{item.priceNote}"
+                      </span>
+                    )}
                   </div>
                 )}
                 {returned && (
