@@ -39,20 +39,19 @@ await app.register(staticFiles, {
   prefix: "/uploads/",
 })
 
-// En server.js — reemplaza el registro de downloads por esto:
+await app.register(staticFiles, {
+  root: path.join(__dirname, "..", "downloads"),
+  prefix: "/downloads/",
+  decorateReply: false,
+})
+
 app.get("/downloads/:filename", async (req, reply) => {
+  const allowed = ["aukani-agent-windows.exe", "aukani-agent-linux"]
   const filename = req.params.filename
-  const filePath = path.join(__dirname, "..", "downloads", filename)
-  
-  try {
-    const stream = fs.createReadStream(filePath)
-    reply
-      .header("Content-Disposition", `attachment; filename="${filename}"`)
-      .header("Content-Type", "application/octet-stream")
-      .send(stream)
-  } catch {
-    reply.status(404).send({ error: "Archivo no encontrado" })
-  }
+  if (!allowed.includes(filename)) return reply.status(404).send({ error: "Archivo no encontrado" })
+  return reply
+    .header("Content-Disposition", `attachment; filename="${filename}"`)
+    .sendFile(filename, path.join(__dirname, "..", "downloads"))
 })
 
 // ── Routes ───────────────────────────────────────────────
