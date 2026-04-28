@@ -207,9 +207,7 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
             </p>
           )}
           {onEditPrice && (
-            <button
-              type="button"
-              onClick={() => onEditPrice(item)}
+            <button type="button" onClick={() => onEditPrice(item)}
               className="w-4 h-4 flex items-center justify-center rounded btn-ghost"
               style={{ color: priceAltered ? "var(--brand)" : "var(--text-muted)" }}
               title="Ajustar precio">
@@ -221,30 +219,17 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
       <div className="flex items-center gap-1 shrink-0">
         <button onClick={() => onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
         {onEditQty ? (
-          <span
-            className="w-8 text-center text-sm font-mono font-bold cursor-pointer rounded px-1 py-0.5 transition-colors active:scale-95"
+          <span className="w-8 text-center text-sm font-mono font-bold cursor-pointer rounded px-1 py-0.5 transition-colors active:scale-95"
             style={{ color: "var(--brand)", background: "var(--brand-light)" }}
-            onClick={() => onEditQty(item.id, item.quantity, item.name)}
-          >{item.quantity}</span>
+            onClick={() => onEditQty(item.id, item.quantity, item.name)}>{item.quantity}</span>
         ) : (
-          <input
-            type="text" inputMode="numeric"
-            value={raw}
+          <input type="text" inputMode="numeric" value={raw}
             onChange={e => setRaw(e.target.value.replace(/\D/g, ""))}
-            onBlur={commit}
-            onKeyDown={e => e.key === "Enter" && e.currentTarget.blur()}
+            onBlur={commit} onKeyDown={e => e.key === "Enter" && e.currentTarget.blur()}
             className="font-mono font-bold text-sm text-center rounded-md"
-            style={{
-              width: "2.25rem", height: "1.75rem",
-              background: "var(--bg-tertiary)",
-              border: "1.5px solid var(--border)",
-              color: "var(--text-primary)",
-              outline: "none",
-              transition: "border-color 0.15s",
-            }}
+            style={{ width: "2.25rem", height: "1.75rem", background: "var(--bg-tertiary)", border: "1.5px solid var(--border)", color: "var(--text-primary)", outline: "none", transition: "border-color 0.15s" }}
             onFocus={e => { e.target.style.borderColor = "var(--brand)"; e.target.select() }}
-            onBlurCapture={e => { e.target.style.borderColor = "var(--border)" }}
-          />
+            onBlurCapture={e => { e.target.style.borderColor = "var(--border)" }} />
         )}
         <button onClick={() => onUpdate(item.id, item.quantity + 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Plus size={11} /></button>
       </div>
@@ -254,6 +239,139 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
       <button onClick={() => onRemove(item.id)} className="btn-ghost w-6 h-6 rounded flex items-center justify-center shrink-0" style={{ color: "var(--danger)" }}>
         <Trash2 size={11} />
       </button>
+    </div>
+  )
+}
+
+// ── Modal pago parcial ────────────────────────────────────
+function PartialPayModal({ items, remoteItems, onConfirm, onClose }) {
+  const [localQty, setLocalQty] = useState(() =>
+    Object.fromEntries(items.map(i => [i.id, 0]))
+  )
+  const [remoteQty, setRemoteQty] = useState(() =>
+    Object.fromEntries(remoteItems.filter(i => i.accountItemId).map(i => [i.accountItemId, 0]))
+  )
+
+  const payingLocal = items
+    .filter(i => (localQty[i.id] || 0) > 0)
+    .map(i => ({ ...i, quantity: localQty[i.id] }))
+  const payingRemote = remoteItems
+    .filter(i => i.accountItemId && (remoteQty[i.accountItemId] || 0) > 0)
+    .map(i => ({ ...i, quantity: remoteQty[i.accountItemId] }))
+
+  const subtotal = payingLocal.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+                 + payingRemote.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+  const hasAny = payingLocal.length > 0 || payingRemote.length > 0
+
+  const renderRow = (item, qty, maxQty, onMinus, onPlus) => {
+    const active = qty > 0
+    return (
+      <div key={item.id ?? item.accountItemId}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg"
+        style={{ background: active ? "var(--brand-light)" : "var(--bg-tertiary)", marginBottom: "4px" }}>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate leading-tight"
+            style={{ color: active ? "var(--text-primary)" : "var(--text-muted)" }}>{item.name}</p>
+          <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+            {formatCOP(item.price)} · {maxQty}u
+          </p>
+        </div>
+        {/* precio: siempre reserva espacio para evitar saltos de layout */}
+        <p className="text-xs font-mono font-bold shrink-0 w-14 text-right"
+          style={{ color: "var(--brand)", visibility: active ? "visible" : "hidden" }}>
+          {formatCOP(Number(item.price) * qty)}
+        </p>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button type="button" onClick={onMinus}
+            className="w-7 h-7 rounded-md flex items-center justify-center font-bold select-none transition-all active:scale-90"
+            style={{ background: "var(--bg-secondary)", border: "1.5px solid var(--border)", color: "var(--text-primary)", fontSize: "1.1rem" }}>−</button>
+          <span className="text-sm font-mono font-bold w-5 text-center"
+            style={{ color: active ? "var(--brand)" : "var(--text-muted)" }}>{qty}</span>
+          <button type="button" onClick={onPlus}
+            className="w-7 h-7 rounded-md flex items-center justify-center font-bold select-none transition-all active:scale-90"
+            style={{ background: active ? "var(--brand)" : "var(--bg-secondary)", border: `1.5px solid ${active ? "var(--brand)" : "var(--border)"}`, color: active ? "white" : "var(--text-primary)", fontSize: "1.1rem" }}>+</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)" }}
+      onPointerDown={onClose} onClick={onClose}>
+      <div className="card w-full rounded-2xl overflow-hidden"
+        style={{ background: "var(--bg-secondary)", maxWidth: "30%", maxHeight: "70vh", display: "flex", flexDirection: "column" }}
+        onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
+          <div>
+            <p className="font-display font-bold text-sm" style={{ color: "var(--text-primary)" }}>Pago parcial</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>¿Cuánto paga esta persona?</p>
+          </div>
+          <button type="button" onPointerDown={onClose}
+            className="w-7 h-7 rounded-full flex items-center justify-center btn-ghost shrink-0">
+            <X size={14} style={{ color: "var(--text-muted)" }} />
+          </button>
+        </div>
+
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto px-3 pb-2">
+          {items.length > 0 && (
+            <>
+              {remoteItems.filter(i => i.accountItemId).length > 0 && (
+                <p className="text-xs font-bold uppercase tracking-wider mb-1.5 mt-1" style={{ color: "var(--text-muted)" }}>
+                  En caja
+                </p>
+              )}
+              {items.map(item => renderRow(
+                item, localQty[item.id] || 0, item.quantity,
+                () => setLocalQty(p => ({ ...p, [item.id]: Math.max(0, (p[item.id] || 0) - 1) })),
+                () => setLocalQty(p => ({ ...p, [item.id]: Math.min(item.quantity, (p[item.id] || 0) + 1) }))
+              ))}
+            </>
+          )}
+          {remoteItems.filter(i => i.accountItemId).length > 0 && (
+            <>
+              {items.length > 0 && (
+                <p className="text-xs font-bold uppercase tracking-wider mb-1.5 mt-2" style={{ color: "var(--text-muted)" }}>
+                  Mesero
+                </p>
+              )}
+              {remoteItems.filter(i => i.accountItemId).map(item => renderRow(
+                { ...item, id: item.accountItemId },
+                remoteQty[item.accountItemId] || 0, item.quantity,
+                () => setRemoteQty(p => ({ ...p, [item.accountItemId]: Math.max(0, (p[item.accountItemId] || 0) - 1) })),
+                () => setRemoteQty(p => ({ ...p, [item.accountItemId]: Math.min(item.quantity, (p[item.accountItemId] || 0) + 1) }))
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Footer: subtotal + botón */}
+        <div className="px-3 pb-4 pt-2 border-t shrink-0" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {hasAny ? `${payingLocal.length + payingRemote.length} ítem${payingLocal.length + payingRemote.length !== 1 ? "s" : ""}` : "Sin selección"}
+            </span>
+            <span className="font-mono font-bold text-base" style={{ color: hasAny ? "var(--brand)" : "var(--text-muted)" }}>
+              {formatCOP(subtotal)}
+            </span>
+          </div>
+          <button type="button"
+            onClick={() => hasAny && onConfirm({ payingLocal, payingRemote, subtotal })}
+            className="w-full rounded-xl font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] select-none"
+            style={{
+              height: "2.75rem", fontSize: "0.95rem",
+              background: hasAny ? "var(--brand)" : "var(--bg-tertiary)",
+              border: `1.5px solid ${hasAny ? "var(--brand)" : "var(--border)"}`,
+              color: hasAny ? "white" : "var(--text-muted)",
+            }}>
+            <CreditCard size={16} />
+            {hasAny ? `Cobrar ${formatCOP(subtotal)}` : "Selecciona ítems"}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -765,6 +883,9 @@ export default function POSPage() {
   const [payments, setPayments] = useState([])
   const [numPad, setNumPad] = useState(null) // { id, value, label }
   const [priceEdit, setPriceEdit] = useState(null) // item being price-edited
+  const [showPartialPay, setShowPartialPay] = useState(false)
+  const [partialSelection, setPartialSelection] = useState(null) // { payingLocal, payingRemote } | null
+  const partialPayCtxRef = useRef(null)
   const { touchMode } = useUiStore()
   const searchRef = useRef(null)
   const qc = useQueryClient()
@@ -774,8 +895,15 @@ export default function POSPage() {
   const active = getActive()
   const items = active?.items || []
   const remoteItems = active?.type === "account" ? (active?.remoteItems || []) : []
-  const total = items.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
-            + remoteItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+  const isAccount = active?.type === "account"
+
+  const payingLocalItems = (isAccount && partialSelection) ? partialSelection.payingLocal : items
+  const payingRemoteItems = (isAccount && partialSelection) ? partialSelection.payingRemote : remoteItems
+  const willBeFullyPaid = !isAccount || !partialSelection
+  const clearPartial = () => { setPartialSelection(null); setShowPartialPay(false) }
+
+  const total = payingLocalItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+              + payingRemoteItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
   const openAccounts = sales.filter(s => s.type === "account")
 
   // Turno
@@ -939,7 +1067,20 @@ export default function POSPage() {
     onSuccess: (data) => {
       const change = data.change || 0
       toast.success(`✅ Venta registrada${change > 0 ? ` · Cambio: ${formatCOP(change)}` : ""}`)
-      closeSale(activeId); setShowPayment(false)
+      const ctx = partialPayCtxRef.current
+      partialPayCtxRef.current = null
+      if (!ctx || ctx.willBeFullyPaid) {
+        closeSale(ctx?.capturedActiveId ?? activeId)
+      } else {
+        // Pago parcial: reducir cantidades locales pagadas
+        ctx.localItemsContext.forEach(({ id, paidQty, totalQty }) => {
+          const remaining = totalQty - paidQty
+          if (remaining <= 0) removeItem(id)
+          else updateQuantity(id, remaining)
+        })
+        clearPartial()
+      }
+      setShowPayment(false)
       qc.invalidateQueries({ queryKey: ["products-all"] })
       qc.invalidateQueries({ queryKey: ["shift-mine"] })
       qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
@@ -964,23 +1105,37 @@ export default function POSPage() {
 
   const handleSell = () => {
     if (!shiftId) { toast.error("Abre un turno antes de vender"); return }
-    if (items.length === 0) return
+    if (payingLocalItems.length === 0 && payingRemoteItems.length === 0) return
     const paid = payments.reduce((s, p) => s + (p.amount || 0), 0)
     if (paid < total) { toast.error(`Falta ${formatCOP(total - paid)} por pagar`); return }
     const allItems = [
-      ...items.map(i => ({
+      ...payingLocalItems.map(i => ({
         productId: i.id,
         quantity: i.quantity,
         ...(i.originalPrice != null && { customPrice: i.price }),
         ...(i.priceNote && { priceNote: i.priceNote }),
       })),
-      ...remoteItems.map(i => ({ productId: i.id, quantity: i.quantity })),
+      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity })),
     ]
+    const accountItemUpdates = payingRemoteItems
+      .filter(i => i.accountItemId)
+      .map(i => ({ id: i.accountItemId, quantityPaid: i.quantity }))
+    partialPayCtxRef.current = {
+      capturedActiveId: activeId,
+      localItemsContext: payingLocalItems.map(pi => {
+        const orig = items.find(i => i.id === pi.id)
+        return { id: pi.id, paidQty: pi.quantity, totalQty: orig?.quantity || pi.quantity }
+      }),
+      willBeFullyPaid,
+    }
     createSale({
       shiftId,
       items: allItems,
       payments: payments.filter(p => (p.amount || 0) > 0).map(p => ({ paymentMethodId: p.paymentMethodId, amount: p.amount })),
-      ...(active?.type === "account" && active?.backendId && { accountId: active.backendId }),
+      ...(active?.type === "account" && active?.backendId && {
+        accountId: active.backendId,
+        accountItemUpdates,
+      }),
     })
   }
 
@@ -1001,7 +1156,7 @@ export default function POSPage() {
     <div className="h-full flex flex-col overflow-hidden">
       <SaleTabs
         sales={sales} activeId={activeId}
-        onSwitch={(id) => { switchSale(id); setShowPayment(false); setQuery("") }}
+        onSwitch={(id) => { switchSale(id); setShowPayment(false); setQuery(""); clearPartial() }}
         onNew={() => { newSale(); setShowPayment(false); setQuery("") }}
         onClose={handleTabClose}
         onNewAccount={() => setShowNewAccount(true)}
@@ -1158,12 +1313,10 @@ export default function POSPage() {
                             {formatCOP(Number(item.price) * item.quantity)}
                           </p>
                           {item.accountItemId && active?.backendId && (
-                            <button
-                              onClick={() => removeAccountItem({ accountBackendId: active.backendId, accountItemId: item.accountItemId })}
+                            <button onClick={() => removeAccountItem({ accountBackendId: active.backendId, accountItemId: item.accountItemId })}
                               disabled={isRemoving}
                               className="btn-ghost w-6 h-6 rounded flex items-center justify-center shrink-0"
-                              style={{ color: "var(--danger)" }}
-                              title="Eliminar de la cuenta">
+                              style={{ color: "var(--danger)" }} title="Eliminar de la cuenta">
                               {isRemoving ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
                             </button>
                           )}
@@ -1178,14 +1331,43 @@ export default function POSPage() {
 
           <div className="p-4 border-t space-y-3" style={{ borderColor: "var(--border)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>Total</span>
+              <div>
+                <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                  {isAccount && partialSelection ? "Pago parcial" : "Total"}
+                </span>
+                {isAccount && partialSelection && (
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {partialSelection.payingLocal.length + partialSelection.payingRemote.length} ítem{(partialSelection.payingLocal.length + partialSelection.payingRemote.length) !== 1 ? "s" : ""} seleccionados
+                  </p>
+                )}
+              </div>
               <span className="font-display font-bold text-2xl font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(total)}</span>
             </div>
 
             {!showPayment ? (
-              <button onClick={() => setShowPayment(true)} disabled={items.length === 0 && remoteItems.length === 0} className="btn-primary btn-lg w-full">
-                <CreditCard size={17} /> Cobrar
-              </button>
+              <div className="space-y-2">
+                <button onClick={() => setShowPayment(true)}
+                  disabled={payingLocalItems.length === 0 && payingRemoteItems.length === 0}
+                  className="btn-primary btn-lg w-full">
+                  <CreditCard size={17} />
+                  {isAccount && partialSelection ? "Cobrar selección" : "Cobrar"}
+                </button>
+                {isAccount && (items.length > 0 || remoteItems.length > 0) && (
+                  partialSelection ? (
+                    <button type="button" onClick={clearPartial}
+                      className="w-full text-xs font-medium py-1.5 rounded-lg"
+                      style={{ color: "var(--text-muted)", border: "1px solid var(--border)", background: "transparent" }}>
+                      Cancelar selección parcial
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => setShowPartialPay(true)}
+                      className="w-full text-xs font-semibold py-1.5 rounded-lg"
+                      style={{ color: "var(--info)", border: "1px solid var(--info)", background: "var(--info-light)" }}>
+                      Dividir cuenta
+                    </button>
+                  )
+                )}
+              </div>
             ) : (
               <div className="space-y-2 animate-slide-up">
                 {payments.map((row, idx) => {
@@ -1326,6 +1508,19 @@ export default function POSPage() {
           item={priceEdit}
           onConfirm={(newPrice, note) => { updateItemPrice(priceEdit.id, newPrice, note); setPriceEdit(null) }}
           onClose={() => setPriceEdit(null)}
+        />
+      )}
+
+      {showPartialPay && (
+        <PartialPayModal
+          items={items}
+          remoteItems={remoteItems}
+          onConfirm={({ payingLocal, payingRemote }) => {
+            setPartialSelection({ payingLocal, payingRemote })
+            setShowPartialPay(false)
+            setShowPayment(true)
+          }}
+          onClose={() => setShowPartialPay(false)}
         />
       )}
     </div>
