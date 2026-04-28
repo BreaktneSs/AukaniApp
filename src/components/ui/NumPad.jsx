@@ -4,7 +4,7 @@ import { formatNumber } from "@/utils/currency"
 
 // mode="quantity" → entero ≥ 1, máx 4 dígitos
 // mode="currency" → entero ≥ 0, máx 9 dígitos, display con formato de miles
-export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, onClose, mode = "quantity" }) {
+export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, onClose, mode = "quantity", minValue }) {
   const isCurrency = mode === "currency"
   const initStr = String(Math.round(Math.max(0, Number(initialValue) || 0)))
 
@@ -37,7 +37,8 @@ export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, o
 
   const handleConfirm = () => {
     const n = parseInt(digitsRef.current) || 0
-    onConfirm(isCurrency ? n : Math.max(1, n))
+    const min = minValue !== undefined ? minValue : (isCurrency ? 0 : 1)
+    onConfirm(Math.max(min, n))
   }
 
   useEffect(() => {
@@ -86,6 +87,7 @@ export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, o
             )}
           </div>
           <button
+            type="button"
             onPointerDown={onClose}
             className="w-7 h-7 rounded-full flex items-center justify-center btn-ghost shrink-0">
             <X size={14} style={{ color: "var(--text-muted)" }} />
@@ -113,6 +115,7 @@ export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, o
             const isClear = key === "C"
             return (
               <button
+                type="button"
                 key={key}
                 onPointerDown={(e) => { e.stopPropagation(); press(key) }}
                 className="h-[3.75rem] rounded-xl font-sans font-semibold text-xl flex items-center justify-center transition-all active:scale-95 select-none"
@@ -135,6 +138,7 @@ export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, o
         {/* Confirm */}
         <div className="px-5 pb-5">
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); handleConfirm() }}
             className="w-full rounded-xl font-sans font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] select-none"
             style={{

@@ -388,23 +388,158 @@ function CloseAccountWarningModal({ account, onConfirm, onClose }) {
 }
 
 // ── Pantalla apertura de turno ────────────────────────────
-function OpenShiftScreen({ onOpen, loading }) {
-  const [rawValue, setRawValue] = useState("")
-  const { user } = useAuthStore()
+// ── Contador de billetes y monedas ───────────────────────
+const BILLS = [100000, 50000, 20000, 10000, 5000, 2000]
 
-  // Parsear solo dígitos y formatear en tiempo real
-  const handleChange = (e) => {
-    const digits = e.target.value.replace(/\D/g, "")
-    setRawValue(digits)
+function BillCounter({ onChange, storageKey }) {
+  const { touchMode } = useUiStore()
+  const [counts, setCounts] = useState(() => {
+    if (storageKey) {
+      try {
+        const stored = sessionStorage.getItem(storageKey)
+        if (stored) return JSON.parse(stored).counts || Object.fromEntries(BILLS.map(b => [b, 0]))
+      } catch {}
+    }
+    return Object.fromEntries(BILLS.map(b => [b, 0]))
+  })
+  const [coinsRaw, setCoinsRaw] = useState(() => {
+    if (storageKey) {
+      try {
+        const stored = sessionStorage.getItem(storageKey)
+        if (stored) return JSON.parse(stored).coinsRaw || ""
+      } catch {}
+    }
+    return ""
+  })
+  const [numPad, setNumPad] = useState(null) // { bill: number|"coins" }
+
+  const coins = Number(coinsRaw) || 0
+  const billsTotal = BILLS.reduce((s, b) => s + b * (counts[b] || 0), 0)
+  const total = billsTotal + coins
+
+  useEffect(() => { onChange(total) }, [total])
+
+  useEffect(() => {
+    if (!storageKey) return
+    try { sessionStorage.setItem(storageKey, JSON.stringify({ counts, coinsRaw })) } catch {}
+  }, [counts, coinsRaw, storageKey])
+
+  const adjust = (bill, delta) =>
+    setCounts(prev => ({ ...prev, [bill]: Math.max(0, (prev[bill] || 0) + delta) }))
+
+  const setCount = (bill, val) => {
+    const n = parseInt(String(val).replace(/\D/g, "")) || 0
+    setCounts(prev => ({ ...prev, [bill]: n }))
   }
 
-  const numericValue = Number(rawValue) || 0
-  const displayValue = rawValue ? formatNumber(numericValue) : ""
+  return (
+    <div className="space-y-1">
+      {BILLS.map(bill => {
+        const qty = counts[bill] || 0
+        const subtotal = bill * qty
+        return (
+          <div key={bill} className="flex items-center gap-2 py-1 rounded-lg px-1"
+            style={{ background: qty > 0 ? "var(--brand-light)" : "transparent" }}>
+            <span className="text-xs font-mono font-semibold w-20 text-right shrink-0"
+              style={{ color: "var(--text-secondary)" }}>
+              {formatCOP(bill)}
+            </span>
+            <button type="button" onClick={() => adjust(bill, -1)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-base select-none"
+              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+              −
+            </button>
+            {touchMode ? (
+              <button type="button"
+                className="w-12 text-center text-sm font-mono font-bold rounded-lg border select-none"
+                style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)", padding: "4px 0" }}
+                onClick={() => setNumPad({ bill, mode: "quantity" })}>
+                {qty || "0"}
+              </button>
+            ) : (
+              <input
+                type="text" inputMode="numeric"
+                className="w-12 text-center text-sm font-mono font-bold rounded-lg border"
+                style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)", padding: "4px 0" }}
+                value={qty || ""}
+                placeholder="0"
+                onChange={e => setCount(bill, e.target.value)}
+                onFocus={e => e.target.select()}
+              />
+            )}
+            <button type="button" onClick={() => adjust(bill, 1)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-base select-none"
+              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+              +
+            </button>
+            <span className="text-xs font-mono ml-auto shrink-0"
+              style={{ color: qty > 0 ? "var(--brand)" : "var(--text-muted)" }}>
+              {qty > 0 ? formatCOP(subtotal) : "—"}
+            </span>
+          </div>
+        )
+      })}
+
+      {/* Monedas */}
+      <div className="flex items-center gap-2 pt-2 mt-1 border-t" style={{ borderColor: "var(--border)" }}>
+        <span className="text-xs font-semibold w-20 text-right shrink-0" style={{ color: "var(--text-secondary)" }}>
+          Monedas
+        </span>
+        <div className="flex-1 relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono"
+            style={{ color: "var(--text-muted)" }}>$</span>
+          {touchMode ? (
+            <button type="button"
+              className="input pl-6 w-full text-sm font-mono text-left select-none"
+              onClick={() => setNumPad({ bill: "coins", mode: "currency" })}>
+              {coins > 0 ? formatNumber(coins) : <span style={{ color: "var(--text-muted)" }}>0</span>}
+            </button>
+          ) : (
+            <input
+              type="text" inputMode="numeric" placeholder="0"
+              className="input pl-6 w-full text-sm font-mono"
+              value={coinsRaw ? formatNumber(coins) : ""}
+              onChange={e => setCoinsRaw(e.target.value.replace(/\D/g, ""))}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* NumPad touch */}
+      {numPad && (
+        <NumPad
+          mode={numPad.mode}
+          minValue={0}
+          initialValue={numPad.bill === "coins" ? coins : (counts[numPad.bill] || 0)}
+          label={numPad.bill === "coins" ? "Monedas" : formatCOP(numPad.bill)}
+          subtitle={numPad.bill !== "coins" ? `Subtotal: ${formatCOP(numPad.bill * (counts[numPad.bill] || 0))}` : undefined}
+          onConfirm={(val) => {
+            if (numPad.bill === "coins") setCoinsRaw(String(val))
+            else setCount(numPad.bill, val)
+            setNumPad(null)
+          }}
+          onClose={() => setNumPad(null)}
+        />
+      )}
+
+      {/* Total */}
+      <div className="flex items-center justify-between pt-3 mt-1 border-t" style={{ borderColor: "var(--border)" }}>
+        <span className="text-sm font-bold" style={{ color: "var(--text-secondary)" }}>Total en caja</span>
+        <span className="font-mono font-bold text-2xl" style={{ color: "var(--brand)" }}>{formatCOP(total)}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Pantalla apertura de turno ────────────────────────────
+function OpenShiftScreen({ onOpen, loading }) {
+  const [total, setTotal] = useState(0)
+  const { user } = useAuthStore()
 
   return (
-    <div className="flex-1 flex items-center justify-center p-6">
-      <div className="card p-8 w-full max-w-sm animate-slide-up space-y-6">
-        <div className="text-center space-y-2">
+    <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+      <div className="card p-6 w-full max-w-sm animate-slide-up space-y-5">
+        <div className="text-center space-y-1">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "var(--brand-light)" }}>
             <LogIn size={28} style={{ color: "var(--brand)" }} />
           </div>
@@ -413,31 +548,20 @@ function OpenShiftScreen({ onOpen, loading }) {
             Hola, <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
           </p>
         </div>
-        <form onSubmit={e => { e.preventDefault(); if (numericValue > 0) onOpen(numericValue) }} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              Efectivo inicial en caja
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold" style={{ color: "var(--text-muted)" }}>$</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                autoFocus
-                className="input pl-10 text-2xl font-mono font-bold text-right pr-4"
-                placeholder="0"
-                value={displayValue}
-                onChange={handleChange}
-              />
-            </div>
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Cuenta el efectivo antes de empezar</p>
-          </div>
-          <button type="submit" disabled={loading || numericValue === 0} className="btn-primary btn-lg w-full">
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-            Abrir turno
-          </button>
-        </form>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>
+            Cuenta el efectivo inicial
+          </p>
+          <BillCounter onChange={setTotal} storageKey="aukani-open-shift" />
+        </div>
+        <button
+          type="button"
+          onClick={() => { if (total >= 0) onOpen(total) }}
+          disabled={loading}
+          className="btn-primary btn-lg w-full">
+          {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+          Abrir turno
+        </button>
       </div>
     </div>
   )
@@ -448,16 +572,8 @@ function OpenShiftScreen({ onOpen, loading }) {
 const NUM = { fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums" }
 
 function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
-  const [rawClosing, setRawClosing] = useState("")
+  const [closingCash, setClosingCash] = useState(0)
   const [notes, setNotes] = useState("")
-
-  const handleClosingChange = (e) => {
-    const digits = e.target.value.replace(/\D/g, "")
-    setRawClosing(digits)
-  }
-
-  const closingCash = Number(rawClosing) || 0
-  const displayClosing = rawClosing ? formatNumber(closingCash) : ""
 
   const cashPayment = shift?.shiftPayments?.find(p => p.paymentMethod?.name === "Efectivo")
   const cashSales = Number(cashPayment?.total || 0)
@@ -467,7 +583,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
     .reduce((s, e) => s + Number(e.amount), 0)
   const totalExpenses = (shift?.expenses || []).reduce((s, e) => s + Number(e.amount), 0)
   const expectedCash = openingCash + cashSales - cashExpenses
-  const difference = rawClosing !== "" ? closingCash - expectedCash : null
+  const difference = closingCash > 0 ? closingCash - expectedCash : null
   const totalSales = (shift?.shiftPayments || []).reduce((s, p) => s + Number(p.total), 0)
 
   const duration = shift?.openedAt ? Math.round((Date.now() - new Date(shift.openedAt)) / 60000) : 0
@@ -591,23 +707,10 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
         {/* ── Formulario ── */}
         <form onSubmit={e => { e.preventDefault(); onConfirm({ closingCash, notes }) }} className="px-6 py-4 space-y-3">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--text-secondary)" }}>
-              Efectivo contado en caja *
+            <label className="block text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-secondary)" }}>
+              Conteo de efectivo en caja
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold" style={{ color: "var(--text-muted)", ...NUM }}>$</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                autoFocus
-                className="input pl-8 text-xl font-bold text-right pr-3"
-                style={NUM}
-                placeholder="0"
-                value={displayClosing}
-                onChange={handleClosingChange}
-              />
-            </div>
+            <BillCounter onChange={(val) => setClosingCash(val)} />
           </div>
 
           {difference !== null && (
@@ -638,7 +741,7 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
-            <button type="submit" disabled={loading || rawClosing === ""}
+            <button type="submit" disabled={loading}
               className="btn-md flex-1 text-white font-bold"
               style={{ background: "var(--danger)" }}>
               {loading ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
@@ -775,7 +878,12 @@ export default function POSPage() {
   // Abrir turno
   const openShift = useMutation({
     mutationFn: (cash) => shiftsService.open(cash),
-    onSuccess: (data) => { resetForNewShift(data.id); qc.invalidateQueries({ queryKey: ["shift-mine"] }); toast.success("Turno abierto") },
+    onSuccess: (data) => {
+      sessionStorage.removeItem("aukani-open-shift")
+      resetForNewShift(data.id)
+      qc.invalidateQueries({ queryKey: ["shift-mine"] })
+      toast.success("Turno abierto")
+    },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
 
