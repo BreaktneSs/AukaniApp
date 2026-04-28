@@ -1,7 +1,7 @@
 import prisma from "../config/prisma.js"
 
 export const orderService = {
-  async createSale({ items, payments, userId, shiftId, accountId = null }) {
+  async createSale({ items, payments, userId, shiftId, accountId = null, accountItemUpdates = [] }) {
     const shift = await prisma.shift.findUnique({ where: { id: shiftId } })
     if (!shift || shift.status !== "OPEN") {
       throw { statusCode: 400, message: "Debes tener un turno abierto para realizar ventas" }
@@ -80,12 +80,28 @@ export const orderService = {
         },
       })
 
-      // Si la venta cierra una cuenta abierta, marcarla como CLOSED
+      // Gestión de cuenta abierta tras el pago
       if (accountId) {
-        await tx.account.update({
-          where: { id: accountId },
-          data: { status: "CLOSED", closedAt: new Date() },
-        })
+        for (const upd of accountItemUpdates) {
+          const ai = await tx.accountItem.findUnique({ where: { id: upd.id } })
+          if (!ai) continue
+          if (upd.quantityPaid >= ai.quantity) {
+            await tx.accountItem.delete({ where: { id: upd.id } })
+          } else {
+            await tx.accountItem.update({
+              where: { id: upd.id },
+              data: { quantity: { decrement: upd.quantityPaid } },
+            })
+          }
+        }
+        // Cerrar la cuenta solo si no quedan items pendientes
+        const remaining = await tx.accountItem.count({ where: { accountId } })
+        if (remaining === 0) {
+          await tx.account.update({
+            where: { id: accountId },
+            data: { status: "CLOSED", closedAt: new Date() },
+          })
+        }
       }
 
       return { ...order, change: totalPaid - total }
