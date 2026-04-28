@@ -208,10 +208,14 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
           )}
           {onEditPrice && (
             <button type="button" onClick={() => onEditPrice(item)}
-              className="w-4 h-4 flex items-center justify-center rounded btn-ghost"
-              style={{ color: priceAltered ? "var(--brand)" : "var(--text-muted)" }}
+              className="flex items-center justify-center rounded-md transition-all active:scale-90"
+              style={{
+                width: "1.25rem", height: "1.25rem",
+                background: priceAltered ? "var(--brand)" : "var(--brand-light)",
+                color: priceAltered ? "white" : "var(--brand)",
+              }}
               title="Ajustar precio">
-              <Pencil size={10} />
+              <Pencil size={9} />
             </button>
           )}
         </div>
@@ -1355,14 +1359,15 @@ export default function POSPage() {
                 {isAccount && (items.length > 0 || remoteItems.length > 0) && (
                   partialSelection ? (
                     <button type="button" onClick={clearPartial}
-                      className="w-full text-xs font-medium py-1.5 rounded-lg"
-                      style={{ color: "var(--text-muted)", border: "1px solid var(--border)", background: "transparent" }}>
+                      className="w-full text-xs font-semibold py-1.5 rounded-lg transition-all active:scale-[0.98]"
+                      style={{ color: "var(--danger)", border: "1px solid var(--danger)", background: "var(--danger-light)" }}>
                       Cancelar selección parcial
                     </button>
                   ) : (
                     <button type="button" onClick={() => setShowPartialPay(true)}
-                      className="w-full text-xs font-semibold py-1.5 rounded-lg"
-                      style={{ color: "var(--info)", border: "1px solid var(--info)", background: "var(--info-light)" }}>
+                      className="w-full text-sm font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                      style={{ color: "white", border: "none", background: "var(--warning)" }}>
+                      <CreditCard size={14} />
                       Dividir cuenta
                     </button>
                   )
