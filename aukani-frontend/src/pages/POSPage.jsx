@@ -29,7 +29,8 @@ function PriceEditModal({ item, onConfirm, onClose }) {
   const numValue = Number(raw) || 0
   const display = raw ? formatNumber(numValue) : ""
 
-  const handleConfirm = () => { if (numValue > 0) onConfirm(numValue, note.trim()) }
+  const noteValid = note.trim().length > 0
+  const handleConfirm = () => { if (numValue > 0 && noteValid) onConfirm(numValue, note.trim()) }
 
   // Touch mode: dos pasos — primero precio, luego motivo
   if (touchMode) {
@@ -62,12 +63,14 @@ function PriceEditModal({ item, onConfirm, onClose }) {
             value={note}
             onChange={e => setNote(e.target.value)}
           />
+          {!noteValid && <p className="text-xs" style={{ color: "var(--danger)" }}>El motivo es obligatorio</p>}
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
             <button
-              onClick={() => onConfirm(numValue, note.trim())}
+              onClick={() => noteValid && onConfirm(numValue, note.trim())}
+              disabled={!noteValid}
               className="btn-md flex-1 font-semibold"
-              style={{ background: "var(--brand)", color: "#fff" }}>
+              style={{ background: "var(--brand)", color: "#fff", opacity: noteValid ? 1 : 0.4 }}>
               Confirmar
             </button>
           </div>
@@ -105,7 +108,7 @@ function PriceEditModal({ item, onConfirm, onClose }) {
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-            Motivo <span style={{ color: "var(--text-muted)" }}>(opcional)</span>
+            Motivo <span style={{ color: "var(--danger)" }}>*</span>
           </label>
           <input
             id="price-note-input"
@@ -121,9 +124,9 @@ function PriceEditModal({ item, onConfirm, onClose }) {
           <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
           <button
             onClick={handleConfirm}
-            disabled={numValue <= 0}
+            disabled={numValue <= 0 || !noteValid}
             className="btn-md flex-1 font-semibold"
-            style={{ background: "var(--brand)", color: "#fff", opacity: numValue <= 0 ? 0.5 : 1 }}>
+            style={{ background: "var(--brand)", color: "#fff", opacity: (numValue <= 0 || !noteValid) ? 0.4 : 1 }}>
             Confirmar
           </button>
         </div>
