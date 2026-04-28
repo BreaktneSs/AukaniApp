@@ -135,7 +135,7 @@ export default function NumPad({ initialValue = 1, label, subtitle, onConfirm, o
         {/* Confirm */}
         <div className="px-5 pb-5">
           <button
-            onPointerDown={(e) => { e.stopPropagation(); handleConfirm() }}
+            onClick={(e) => { e.stopPropagation(); handleConfirm() }}
             className="w-full rounded-xl font-sans font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] select-none"
             style={{
               height: "3.75rem",
