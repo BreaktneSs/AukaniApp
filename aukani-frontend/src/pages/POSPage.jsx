@@ -159,18 +159,20 @@ function ProductCard({ product, onAdd }) {
       }
       {/* Info superpuesta en la parte inferior */}
       <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1"
-        style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}>
-        <p className="text-xs font-semibold leading-tight line-clamp-1 text-white">
+        style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)" }}>
+        <p className="text-xs font-semibold leading-tight line-clamp-1"
+          style={{ color: "var(--product-label-color)" }}>
           {product.name}
         </p>
         <div className="flex items-center justify-between mt-0.5">
-          <p className="font-mono font-bold text-xs text-white">
+          <p className="font-mono font-bold text-xs"
+            style={{ color: "var(--product-label-color)" }}>
             {formatCOP(product.price)}
           </p>
           {product.type === "SERVICE" ? (
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>Servicio</p>
+            <p className="text-xs" style={{ color: "var(--product-label-color)", opacity: 0.6 }}>Servicio</p>
           ) : (
-            <p className="text-xs" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "rgba(255,255,255,0.55)" }}>
+            <p className="text-xs font-semibold" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "#000000" }}>
               {product.stock} uds
             </p>
           )}
