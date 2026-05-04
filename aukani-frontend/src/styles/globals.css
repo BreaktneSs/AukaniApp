@@ -8,6 +8,7 @@
   :root {
     color-scheme: light;
     --product-label-color: #ffffff;
+    --product-stock-color: #000000;
     --bg-primary:     #fbf7f4;
     --bg-secondary:   #f2ebe5;
     --bg-tertiary:    #e5dbd2;
@@ -28,6 +29,7 @@
 
   .dark {
     color-scheme: dark;
+    --product-stock-color: rgba(255,255,255,0.55);
     --bg-primary:     #0c1118;
     --bg-secondary:   #131b23;
     --bg-tertiary:    #1c2a36;

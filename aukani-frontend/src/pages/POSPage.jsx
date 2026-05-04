@@ -172,7 +172,7 @@ function ProductCard({ product, onAdd }) {
           {product.type === "SERVICE" ? (
             <p className="text-xs" style={{ color: "var(--product-label-color)", opacity: 0.6 }}>Servicio</p>
           ) : (
-            <p className="text-xs font-semibold" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "#000000" }}>
+            <p className="text-xs font-semibold" style={{ color: product.stock <= product.minStock ? "var(--warning)" : "var(--product-stock-color)" }}>
               {product.stock} uds
             </p>
           )}
