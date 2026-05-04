@@ -1,12 +1,12 @@
 import { useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/auth.store"
-import { useThemeStore } from "@/store/theme.store"
 import {
   ShoppingCart, BarChart3, ClipboardList, Settings,
-  LogOut, Sun, Moon, Boxes, Menu,
+  LogOut, Boxes, Menu,
   Landmark, Smartphone, Bell, ShieldCheck, CalendarDays
 } from "lucide-react"
+import AccessibilityWidget from "@/components/ui/AccessibilityWidget"
 
 const nav = [
   { to: "/pos",          icon: ShoppingCart,  label: "Caja",               roles: ["ADMIN","JEFE","VENDEDOR"] },
@@ -23,7 +23,6 @@ const nav = [
 
 export default function MainLayout() {
   const { user, logout } = useAuthStore()
-  const { theme, toggle } = useThemeStore()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
@@ -114,11 +113,7 @@ export default function MainLayout() {
             {user?.name?.[0]?.toUpperCase()}
           </div>
           <span className="font-display font-bold text-sm truncate flex-1" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
-          <button onClick={toggle} title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-            className="w-8 h-8 rounded-md flex items-center justify-center btn-ghost shrink-0"
-            style={{ color: "var(--text-muted)" }}>
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+          <AccessibilityWidget />
         </header>
 
         <main className="flex-1 overflow-auto"><Outlet /></main>
