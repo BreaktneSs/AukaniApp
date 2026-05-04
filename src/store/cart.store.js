@@ -47,6 +47,7 @@ export const useCartStore = create((set, get) => ({
   nextId: initialNextId,
   nextLocalNum: initialNextLocalNum,
   shiftId: null,
+  flashingTabId: null,
 
   // ── Turno ──────────────────────────────────────────────
   setShift: (shiftId) => set({ shiftId }),
@@ -121,6 +122,19 @@ export const useCartStore = create((set, get) => ({
     set({ sales: updated, activeId: newActive })
     saveSales(updated, newActive, nextLocalNum)
   },
+
+  // Cierra la venta dada y siempre abre una nueva venta genérica, marcándola como flash
+  closeSaleAndNew: (id) => {
+    const { sales, nextId, nextLocalNum } = get()
+    const remaining = sales.filter(s => s.id !== id)
+    const newId = nextId
+    const fresh = createSale(newId, nextLocalNum)
+    const updated = [...remaining, fresh]
+    set({ sales: updated, activeId: newId, nextId: nextId + 1, nextLocalNum: nextLocalNum + 1, flashingTabId: newId })
+    saveSales(updated, newId, nextLocalNum + 1)
+  },
+
+  clearFlashingTab: () => set({ flashingTabId: null }),
 
   // ── Items del carrito (opera sobre venta activa) ──────
   addItem: (product) => {
