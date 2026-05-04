@@ -84,7 +84,7 @@ export const dispatchService = {
         if (!product || !product.active) throw { statusCode: 404, message: `Producto no encontrado: ${item.productId}` }
 
         const isService = product.type === "SERVICE"
-        if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}"` }
+        if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: "Stock insuficiente" }
 
         total += Number(product.price) * item.quantity
         dispatchItems.push({ productId: product.id, quantity: item.quantity, price: product.price, isService })

@@ -25,6 +25,22 @@ export const accountController = {
     reply.send(accounts)
   },
 
+  async addCashierItem(req, reply) {
+    const accountId = Number(req.params.id)
+    const { productId, price } = req.body
+    if (!productId) return reply.code(400).send({ error: "productId requerido" })
+    const item = await accountService.addCashierItem(accountId, { productId: Number(productId), price }, req.user.id)
+    reply.code(201).send(item)
+  },
+
+  async updateItem(req, reply) {
+    const accountId = Number(req.params.id)
+    const itemId    = Number(req.params.itemId)
+    const { quantity, price } = req.body
+    const item = await accountService.updateItem(accountId, itemId, { quantity, price }, req.user.id)
+    reply.send(item ?? {})
+  },
+
   async removeItem(req, reply) {
     const accountId = Number(req.params.id)
     const itemId    = Number(req.params.itemId)
