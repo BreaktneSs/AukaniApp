@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { Accessibility, Sun, Moon, X, Check, Plus } from "lucide-react"
+import { Palette, Sun, Moon, X, Check, Plus } from "lucide-react"
 import { useThemeStore } from "@/store/theme.store"
 import { useA11yStore, PRODUCT_LABEL_PRESETS } from "@/store/a11y.store"
 
@@ -41,9 +41,10 @@ export default function AccessibilityWidget() {
     return () => document.removeEventListener("mousedown", onDown)
   }, [])
 
-  const activeLabel = isCustomActive
+  const activePreset = PRODUCT_LABEL_PRESETS.find(p => p.key === productLabelColor)
+  const activeLabel  = isCustomActive
     ? "Personalizado"
-    : PRODUCT_LABEL_PRESETS.find(p => p.key === productLabelColor)?.label ?? ""
+    : (isDark ? activePreset?.darkLabel : activePreset?.lightLabel) ?? ""
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -54,7 +55,7 @@ export default function AccessibilityWidget() {
         title="Accesibilidad"
         className="w-8 h-8 rounded-md flex items-center justify-center btn-ghost shrink-0"
         style={{ color: open ? "var(--brand)" : "var(--text-muted)" }}>
-        <Accessibility size={16} />
+        <Palette size={16} />
       </button>
 
       {/* Dropdown panel */}
@@ -122,17 +123,19 @@ export default function AccessibilityWidget() {
               {/* Swatches */}
               <div className="flex gap-2 flex-wrap items-center">
                 {PRODUCT_LABEL_PRESETS.map(preset => {
-                  const active = productLabelColor === preset.key
-                  const light  = isLight(preset.color)
+                  const active  = productLabelColor === preset.key
+                  const color   = isDark ? preset.dark : preset.light
+                  const label   = isDark ? preset.darkLabel : preset.lightLabel
+                  const light   = isLight(color)
                   return (
                     <button
                       key={preset.key}
-                      title={preset.label}
+                      title={label}
                       onClick={() => setProductLabelColor(preset.key)}
                       style={{
                         width: 28, height: 28,
                         borderRadius: "50%",
-                        background: preset.color,
+                        background: color,
                         border: active ? "2.5px solid var(--brand)" : "2px solid var(--border)",
                         boxShadow: active ? "0 0 0 2px var(--brand-light)" : "none",
                         display: "flex", alignItems: "center", justifyContent: "center",
