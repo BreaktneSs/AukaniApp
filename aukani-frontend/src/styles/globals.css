@@ -85,6 +85,11 @@
     font-variant-numeric: tabular-nums;
   }
 
+  @keyframes tab-blink {
+    0%, 100% { box-shadow: 0 0 0 2px var(--brand), inset 0 0 0 2px var(--brand-light); }
+    50%       { box-shadow: none; }
+  }
+
   /* Scrollbar personalizado */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   /* Ocultar scrollbar en tabs de ventas */

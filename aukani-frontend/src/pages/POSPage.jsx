@@ -396,13 +396,14 @@ function PartialPayModal({ items, remoteItems, onConfirm, onClose }) {
 }
 
 // ── SaleTabs ──────────────────────────────────────────────
-function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount }) {
+function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, flashingId }) {
   const genericSales = sales.filter(s => s.type !== "account")
   const accounts = sales.filter(s => s.type === "account")
 
   const renderTab = (sale) => {
-    const isActive = sale.id === activeId
-    const isAccount = sale.type === "account"
+    const isActive   = sale.id === activeId
+    const isFlashing = sale.id === flashingId
+    const isAccount  = sale.type === "account"
     const count = sale.items.reduce((s, i) => s + i.quantity, 0)
     return (
       <div key={sale.id} onClick={() => onSwitch(sale.id)}
@@ -412,6 +413,7 @@ function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount }) {
           borderColor: isActive ? "var(--border)" : "transparent",
           borderBottomColor: isActive ? "var(--bg-primary)" : "transparent",
           minWidth: "90px", maxWidth: "150px",
+          animation: isFlashing ? "tab-blink 0.75s ease-in-out infinite" : "none",
         }}>
         {isAccount && (
           <User size={11} className="shrink-0" style={{ color: isActive ? "var(--info)" : "var(--text-muted)" }} />
@@ -910,7 +912,7 @@ export default function POSPage() {
   const qc = useQueryClient()
 
   const navigate = useNavigate()
-  const { sales, activeId, shiftId, resetForNewShift, newSale, newAccount, switchSale, closeSale, addItem, removeItem, updateQuantity, updateItemPrice, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems } = useCartStore()
+  const { sales, activeId, shiftId, flashingTabId, resetForNewShift, newSale, newAccount, switchSale, closeSale, closeSaleAndNew, clearFlashingTab, addItem, removeItem, updateQuantity, updateItemPrice, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems } = useCartStore()
   const active = getActive()
   const items = active?.items || []
   const remoteItems = active?.type === "account" ? (active?.remoteItems || []) : []
@@ -1016,6 +1018,11 @@ export default function POSPage() {
 
   useEffect(() => { searchRef.current?.focus() }, [activeId, shift?.id])
 
+  // Limpiar el parpadeo cuando el usuario agrega un producto o escribe en la búsqueda
+  useEffect(() => {
+    if (flashingTabId && (items.length > 0 || query.length > 0)) clearFlashingTab()
+  }, [items.length, query])
+
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") { setQuery(""); setShowPayment(false); searchRef.current?.focus() } }
     window.addEventListener("keydown", h)
@@ -1108,7 +1115,7 @@ export default function POSPage() {
       const ctx = partialPayCtxRef.current
       partialPayCtxRef.current = null
       if (!ctx || ctx.willBeFullyPaid) {
-        closeSale(ctx?.capturedActiveId ?? activeId)
+        closeSaleAndNew(ctx?.capturedActiveId ?? activeId)
       } else {
         // Pago parcial: reducir cantidades locales pagadas
         ctx.localItemsContext.forEach(({ id, paidQty, totalQty }) => {
@@ -1209,9 +1216,9 @@ export default function POSPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <SaleTabs
-        sales={sales} activeId={activeId}
-        onSwitch={(id) => { switchSale(id); setShowPayment(false); setQuery(""); clearPartial() }}
-        onNew={() => { newSale(); setShowPayment(false); setQuery("") }}
+        sales={sales} activeId={activeId} flashingId={flashingTabId}
+        onSwitch={(id) => { switchSale(id); setShowPayment(false); setQuery(""); clearPartial(); clearFlashingTab() }}
+        onNew={() => { newSale(); setShowPayment(false); setQuery(""); clearFlashingTab() }}
         onClose={handleTabClose}
         onNewAccount={() => setShowNewAccount(true)}
       />
