@@ -181,20 +181,27 @@ function ProductCard({ product, onAdd }) {
 }
 
 // ── CartItem ──────────────────────────────────────────────
-function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
+function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice, maxQty }) {
+  const busy = item._busy
   const [raw, setRaw] = useState(String(item.quantity))
   useEffect(() => { setRaw(String(item.quantity)) }, [item.quantity])
 
   const commit = () => {
     const val = parseInt(raw, 10)
-    if (val > 0) onUpdate(item.id, val)
-    else setRaw(String(item.quantity))
+    if (val > 0) {
+      if (maxQty !== undefined && val > maxQty) {
+        toast.error("Stock insuficiente")
+        setRaw(String(item.quantity))
+        return
+      }
+      onUpdate(item.id, val)
+    } else setRaw(String(item.quantity))
   }
 
   const priceAltered = item.originalPrice != null && Number(item.originalPrice) !== Number(item.price)
 
   return (
-    <div className="flex items-center gap-2 py-2.5 border-b animate-fade-in" style={{ borderColor: "var(--border)" }}>
+    <div className="flex items-center gap-2 py-2.5 border-b animate-fade-in" style={{ borderColor: "var(--border)", opacity: busy ? 0.6 : 1 }}>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
         <div className="flex items-center gap-1.5">
@@ -207,7 +214,7 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
             </p>
           )}
           {onEditPrice && (
-            <button type="button" onClick={() => onEditPrice(item)}
+            <button type="button" onClick={() => onEditPrice(item)} disabled={busy}
               className="flex items-center justify-center rounded-md transition-all active:scale-90"
               style={{
                 width: "1.25rem", height: "1.25rem",
@@ -221,13 +228,15 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <button onClick={() => onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
+        <button onClick={() => !busy && onUpdate(item.id, item.quantity - 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Minus size={11} /></button>
         {onEditQty ? (
           <span className="w-8 text-center text-sm font-mono font-bold cursor-pointer rounded px-1 py-0.5 transition-colors active:scale-95"
             style={{ color: "var(--brand)", background: "var(--brand-light)" }}
-            onClick={() => onEditQty(item.id, item.quantity, item.name)}>{item.quantity}</span>
+            onClick={() => !busy && onEditQty(item.id, item.quantity, item.name)}>
+            {busy ? <Loader2 size={11} className="animate-spin mx-auto block" /> : item.quantity}
+          </span>
         ) : (
-          <input type="text" inputMode="numeric" value={raw}
+          <input type="text" inputMode="numeric" value={raw} disabled={busy}
             onChange={e => setRaw(e.target.value.replace(/\D/g, ""))}
             onBlur={commit} onKeyDown={e => e.key === "Enter" && e.currentTarget.blur()}
             className="font-mono font-bold text-sm text-center rounded-md"
@@ -235,7 +244,11 @@ function CartItem({ item, onUpdate, onRemove, onEditQty, onEditPrice }) {
             onFocus={e => { e.target.style.borderColor = "var(--brand)"; e.target.select() }}
             onBlurCapture={e => { e.target.style.borderColor = "var(--border)" }} />
         )}
-        <button onClick={() => onUpdate(item.id, item.quantity + 1)} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Plus size={11} /></button>
+        <button onClick={() => {
+          if (busy) return
+          if (maxQty !== undefined && item.quantity >= maxQty) { toast.error("Stock insuficiente"); return }
+          onUpdate(item.id, item.quantity + 1)
+        }} className="w-6 h-6 rounded flex items-center justify-center btn-ghost"><Plus size={11} /></button>
       </div>
       <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
         {formatCOP(Number(item.price) * item.quantity)}
@@ -1056,12 +1069,31 @@ export default function POSPage() {
     onError: e => toast.error(e.response?.data?.error || "Error al cerrar cuenta"),
   })
 
-  // Eliminar item de cuenta remota
-  const { mutate: removeAccountItem, variables: removingItemId } = useMutation({
+  const invalidateAccount = () => {
+    qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
+    qc.invalidateQueries({ queryKey: ["products-all"] })
+  }
+
+  // Agregar +1 producto a cuenta (desde tarjeta de producto)
+  const { mutate: incrementAccountItem } = useMutation({
+    mutationFn: ({ accountBackendId, productId, price }) =>
+      accountsService.addItem(accountBackendId, { productId, price }),
+    onSuccess: invalidateAccount,
+    onError: e => toast.error(e.response?.data?.error || "Sin stock disponible"),
+  })
+
+  // Actualizar cantidad o precio de AccountItem
+  const { mutate: updateAccountItem, isPending: isUpdatingAccount, variables: updatingVars } = useMutation({
+    mutationFn: ({ accountBackendId, accountItemId, ...body }) =>
+      accountsService.updateItem(accountBackendId, accountItemId, body),
+    onSuccess: invalidateAccount,
+    onError: e => toast.error(e.response?.data?.error || "Error al actualizar item"),
+  })
+
+  // Eliminar item completo de cuenta
+  const { mutate: removeAccountItem, isPending: isRemovingAccount, variables: removingVars } = useMutation({
     mutationFn: ({ accountBackendId, accountItemId }) => accountsService.removeItem(accountBackendId, accountItemId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
-    },
+    onSuccess: invalidateAccount,
     onError: e => toast.error(e.response?.data?.error || "Error al eliminar item"),
   })
 
@@ -1093,7 +1125,23 @@ export default function POSPage() {
   })
 
   const handleAddToCart = (product) => {
-    if (product.type !== "SERVICE" && product.stock <= 0) { toast.error("Sin stock disponible"); return }
+    if (product.type !== "SERVICE") {
+      // Calcula cuánto hay ya comprometido entre carrito local + remoteItems de esta pestaña
+      const inLocal  = items.find(i => i.id === product.id)?.quantity || 0
+      const inRemote = remoteItems.find(i => i.id === product.id)?.quantity || 0
+      const available = product.stock - inLocal - inRemote
+      if (available <= 0) {
+        toast.error("Sin stock disponible")
+        return
+      }
+    }
+
+    // En pestañas de cuenta: registrar inmediatamente en backend (descuenta stock al instante)
+    if (isAccount && active?.backendId) {
+      incrementAccountItem({ accountBackendId: active.backendId, productId: product.id, price: product.price })
+      return
+    }
+
     addItem(product)
   }
 
@@ -1119,7 +1167,7 @@ export default function POSPage() {
         ...(i.originalPrice != null && { customPrice: i.price }),
         ...(i.priceNote && { priceNote: i.priceNote }),
       })),
-      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity })),
+      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity, alreadyDecremented: true })),
     ]
     const accountItemUpdates = payingRemoteItems
       .filter(i => i.accountItemId)
@@ -1281,54 +1329,57 @@ export default function POSPage() {
               </div>
             ) : (
               <>
-                {items.length > 0 && (
+                {/* Items locales — solo en ventas genéricas (no cuentas) */}
+                {!isAccount && items.length > 0 && (
                   <>
                     <div className="flex justify-end py-1">
                       <button onClick={clearActive} className="text-xs btn-ghost px-2 py-0.5 rounded" style={{ color: "var(--danger)" }}>Limpiar</button>
                     </div>
-                    {items.map(item => (
-                      <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem}
-                        onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
-                        onEditPrice={(it) => setPriceEdit(it)}
-                      />
-                    ))}
-                  </>
-                )}
-                {remoteItems.length > 0 && (
-                  <>
-                    <div className="flex items-center gap-2 py-2 mt-1">
-                      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                      <span className="text-xs font-medium shrink-0" style={{ color: "var(--info)" }}>
-                        Pedidos mesero
-                      </span>
-                      <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                    </div>
-                    {remoteItems.map((item, idx) => {
-                      const isRemoving = removingItemId?.accountItemId === item.accountItemId
+                    {items.map(item => {
+                      const productStock = allProducts.find(p => p.id === item.id)?.stock
                       return (
-                        <div key={idx} className="flex items-center gap-2 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.name}</p>
-                            <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{formatCOP(item.price)}</p>
-                          </div>
-                          <span className="text-xs px-2 py-0.5 rounded font-mono font-bold"
-                            style={{ background: "var(--info-light)", color: "var(--info)" }}>×{item.quantity}</span>
-                          <p className="font-mono text-sm font-bold w-14 text-right shrink-0" style={{ color: "var(--text-primary)" }}>
-                            {formatCOP(Number(item.price) * item.quantity)}
-                          </p>
-                          {item.accountItemId && active?.backendId && (
-                            <button onClick={() => removeAccountItem({ accountBackendId: active.backendId, accountItemId: item.accountItemId })}
-                              disabled={isRemoving}
-                              className="btn-ghost w-6 h-6 rounded flex items-center justify-center shrink-0"
-                              style={{ color: "var(--danger)" }} title="Eliminar de la cuenta">
-                              {isRemoving ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
-                            </button>
-                          )}
-                        </div>
+                        <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem}
+                          onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
+                          onEditPrice={(it) => setPriceEdit(it)}
+                          maxQty={productStock}
+                        />
                       )
                     })}
                   </>
                 )}
+                {/* Items de cuenta — mismo CartItem que ventas normales, callbacks apuntan al backend */}
+                {isAccount && remoteItems.map(item => {
+                  const availableStock = allProducts.find(p => p.id === item.id)?.stock ?? 0
+                  const isBusy = (isUpdatingAccount && updatingVars?.accountItemId === item.accountItemId) ||
+                                 (isRemovingAccount && removingVars?.accountItemId === item.accountItemId)
+                  return (
+                    <CartItem
+                      key={item.accountItemId ?? item.id}
+                      item={{ ...item, _busy: isBusy }}
+                      maxQty={item.quantity + availableStock}
+                      onUpdate={(id, newQty) => {
+                        const ri = remoteItems.find(i => i.id === id)
+                        if (ri?.accountItemId) updateAccountItem({ accountBackendId: active.backendId, accountItemId: ri.accountItemId, quantity: newQty })
+                      }}
+                      onRemove={(id) => {
+                        const ri = remoteItems.find(i => i.id === id)
+                        if (ri?.accountItemId) removeAccountItem({ accountBackendId: active.backendId, accountItemId: ri.accountItemId })
+                      }}
+                      onEditQty={touchMode ? (id, val, name) => {
+                        const ri = remoteItems.find(i => i.id === id)
+                        setNumPad({ id, value: val, label: name,
+                          onConfirm: ri?.accountItemId ? (newQty) => updateAccountItem({ accountBackendId: active.backendId, accountItemId: ri.accountItemId, quantity: newQty }) : null,
+                        })
+                      } : undefined}
+                      onEditPrice={(it) => {
+                        const ri = remoteItems.find(i => i.id === it.id)
+                        setPriceEdit({ ...it,
+                          _onConfirm: ri?.accountItemId ? (newPrice) => updateAccountItem({ accountBackendId: active.backendId, accountItemId: ri.accountItemId, price: newPrice }) : null,
+                        })
+                      }}
+                    />
+                  )
+                })}
               </>
             )}
           </div>
@@ -1503,7 +1554,11 @@ export default function POSPage() {
         <NumPad
           initialValue={numPad.value}
           label={numPad.label}
-          onConfirm={(val) => { updateQuantity(numPad.id, val); setNumPad(null) }}
+          onConfirm={(val) => {
+            if (numPad.onConfirm) numPad.onConfirm(val)
+            else updateQuantity(numPad.id, val)
+            setNumPad(null)
+          }}
           onClose={() => setNumPad(null)}
         />
       )}
@@ -1511,7 +1566,11 @@ export default function POSPage() {
       {priceEdit && (
         <PriceEditModal
           item={priceEdit}
-          onConfirm={(newPrice, note) => { updateItemPrice(priceEdit.id, newPrice, note); setPriceEdit(null) }}
+          onConfirm={(newPrice, note) => {
+            if (priceEdit._onConfirm) priceEdit._onConfirm(newPrice, note)
+            else updateItemPrice(priceEdit.id, newPrice, note)
+            setPriceEdit(null)
+          }}
           onClose={() => setPriceEdit(null)}
         />
       )}

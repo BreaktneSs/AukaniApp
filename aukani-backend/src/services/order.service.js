@@ -16,7 +16,10 @@ export const orderService = {
         if (!product || !product.active) throw { statusCode: 404, message: `Producto no encontrado: ID ${item.productId}` }
 
         const isService = product.type === "SERVICE"
-        if (!isService && product.stock < item.quantity) throw { statusCode: 409, message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }
+        // alreadyDecremented: items from AccountItems (dispatch or cashier-added) had stock decremented at add time
+        if (!isService && !item.alreadyDecremented && product.stock < item.quantity) {
+          throw { statusCode: 409, message: "Stock insuficiente" }
+        }
 
         const customPrice = item.customPrice != null && Number(item.customPrice) > 0
           ? Number(item.customPrice)
@@ -35,7 +38,7 @@ export const orderService = {
           ...(originalPrice !== null && item.priceNote && { priceNote: item.priceNote }),
         })
 
-        if (!isService) {
+        if (!isService && !item.alreadyDecremented) {
           await tx.product.update({ where: { id: product.id }, data: { stock: { decrement: item.quantity } } })
           await tx.inventoryMovement.create({ data: { productId: product.id, userId, type: "SALE", quantity: item.quantity, reason: "Venta" } })
         }
