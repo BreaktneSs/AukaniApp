@@ -21,6 +21,7 @@ import { auditRoutes }     from "./routes/audit.routes.js"
 import { accountRoutes }   from "./routes/account.routes.js"
 import { expenseRoutes }     from "./routes/expense.routes.js"
 import { reservationRoutes } from "./routes/reservation.routes.js"
+import { purchaseRoutes }    from "./routes/purchase.routes.js"
 import { errorHandler }    from "./middlewares/errorHandler.js"
 import prisma              from "./config/prisma.js"
 
@@ -66,6 +67,7 @@ await app.register(dispatchRoutes)
 await app.register(accountRoutes)
 await app.register(expenseRoutes)
 await app.register(reservationRoutes)
+await app.register(purchaseRoutes)
 await app.register(auditRoutes)
 
 // ── Error handler ────────────────────────────────────────
