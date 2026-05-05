@@ -15,6 +15,7 @@ import {
   Search, X, Plus, Minus, Trash2, ShoppingCart,
   CreditCard, Banknote, Loader2, Package,
   PlusCircle, LogIn, LogOut, Bell, User, UserPlus, AlertTriangle, Pencil,
+  ChevronLeft, ChevronRight,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { formatCOP, formatNumber } from "@/utils/currency"
@@ -398,7 +399,29 @@ function PartialPayModal({ items, remoteItems, onConfirm, onClose }) {
 // ── SaleTabs ──────────────────────────────────────────────
 function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, flashingId }) {
   const genericSales = sales.filter(s => s.type !== "account")
-  const accounts = sales.filter(s => s.type === "account")
+  const accounts     = sales.filter(s => s.type === "account")
+  const scrollRef    = useRef(null)
+  const [canLeft,  setCanLeft]  = useState(false)
+  const [canRight, setCanRight] = useState(false)
+
+  const checkScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanLeft(el.scrollLeft > 4)
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    checkScroll()
+    el.addEventListener("scroll", checkScroll, { passive: true })
+    const ro = new ResizeObserver(checkScroll)
+    ro.observe(el)
+    return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect() }
+  }, [sales.length])
+
+  const scrollBy = (dir) => scrollRef.current?.scrollBy({ left: dir * 160, behavior: "smooth" })
 
   const renderTab = (sale) => {
     const isActive   = sale.id === activeId
@@ -438,27 +461,54 @@ function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, fla
   }
 
   return (
-    <div className="tabs-no-scrollbar flex items-center gap-1 px-2 pt-2 overflow-x-auto border-b shrink-0"
-      style={{ borderColor: "var(--border)", background: "var(--bg-secondary)", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+    <div className="relative flex items-center shrink-0 border-b"
+      style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
 
-      {/* Ventas genéricas */}
-      {genericSales.map(sale => renderTab(sale))}
-      <button onClick={onNew}
-        className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100"
-        style={{ color: "var(--text-muted)" }} title="Nueva venta">
-        <PlusCircle size={15} />
-      </button>
+      {/* Botón scroll izquierda */}
+      {canLeft && (
+        <button
+          onClick={() => scrollBy(-1)}
+          className="absolute left-0 z-10 h-full px-1 flex items-center justify-center"
+          style={{ background: "linear-gradient(to right, var(--bg-secondary) 60%, transparent)" }}>
+          <ChevronLeft size={16} style={{ color: "var(--text-muted)" }} />
+        </button>
+      )}
 
-      {/* Separador */}
-      <div className="h-5 w-px mx-1.5 shrink-0" style={{ background: "var(--border)" }} />
+      {/* Contenedor scrollable */}
+      <div
+        ref={scrollRef}
+        className="tabs-no-scrollbar flex items-center gap-1 px-2 pt-2 overflow-x-auto flex-1"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
 
-      {/* Cuentas abiertas */}
-      {accounts.map(sale => renderTab(sale))}
-      <button onClick={onNewAccount}
-        className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100"
-        style={{ color: "var(--info)" }} title="Nueva cuenta">
-        <UserPlus size={15} />
-      </button>
+        {/* Ventas genéricas */}
+        {genericSales.map(sale => renderTab(sale))}
+        <button onClick={onNew}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100"
+          style={{ color: "var(--text-muted)" }} title="Nueva venta">
+          <PlusCircle size={15} />
+        </button>
+
+        {/* Separador */}
+        <div className="h-5 w-px mx-1.5 shrink-0" style={{ background: "var(--border)" }} />
+
+        {/* Cuentas abiertas */}
+        {accounts.map(sale => renderTab(sale))}
+        <button onClick={onNewAccount}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-t-md shrink-0 opacity-50 hover:opacity-100"
+          style={{ color: "var(--info)" }} title="Nueva cuenta">
+          <UserPlus size={15} />
+        </button>
+      </div>
+
+      {/* Botón scroll derecha */}
+      {canRight && (
+        <button
+          onClick={() => scrollBy(1)}
+          className="absolute right-0 z-10 h-full px-1 flex items-center justify-center"
+          style={{ background: "linear-gradient(to left, var(--bg-secondary) 60%, transparent)" }}>
+          <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
+        </button>
+      )}
     </div>
   )
 }
