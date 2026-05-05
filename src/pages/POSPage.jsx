@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { useCartStore } from "@/store/cart.store"
 import { useAuthStore } from "@/store/auth.store"
 import { productsService } from "@/services/products.service"
@@ -990,6 +990,7 @@ export default function POSPage() {
     queryKey: ["products-all"],
     queryFn: () => productsService.getAll({ limit: 200 }),
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
   })
   const allProducts = [...(allData?.products || [])].sort((a, b) => a.name.localeCompare(b.name))
 

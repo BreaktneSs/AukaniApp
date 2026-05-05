@@ -16,6 +16,7 @@ import WaiterPage from "@/pages/WaiterPage"
 import DispatchPage from "@/pages/DispatchPage"
 import AuditPage from "@/pages/AuditPage"
 import ReservationsPage from "@/pages/ReservationsPage"
+import PurchasesPage from "@/pages/PurchasesPage"
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } })
 
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/waiter"    element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><WaiterPage /></ProtectedRoute>} />
             <Route path="/dispatch"  element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><DispatchPage /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><InventoryPage /></ProtectedRoute>} />
+            <Route path="/purchases" element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><PurchasesPage /></ProtectedRoute>} />
             <Route path="/sales"     element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><SalesPage /></ProtectedRoute>} />
             <Route path="/shifts"    element={<ProtectedRoute roles={["ADMIN","JEFE"]}><ShiftsPage /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute roles={["ADMIN","JEFE"]}><DashboardPage /></ProtectedRoute>} />
