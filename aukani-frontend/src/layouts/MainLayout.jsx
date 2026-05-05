@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/auth.store"
 import {
   ShoppingCart, BarChart3, ClipboardList, Settings,
   LogOut, Boxes, Menu,
-  Landmark, Smartphone, Bell, ShieldCheck, CalendarDays
+  Landmark, Smartphone, Bell, ShieldCheck, CalendarDays, ShoppingBag
 } from "lucide-react"
 import AccessibilityWidget from "@/components/ui/AccessibilityWidget"
 
@@ -14,6 +14,7 @@ const nav = [
   { to: "/dispatch",     icon: Bell,          label: "Despachos",          roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/reservations", icon: CalendarDays,  label: "Reservas",           roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/inventory",    icon: Boxes,         label: "Inventario",         roles: ["ADMIN","JEFE","VENDEDOR"] },
+  { to: "/purchases",    icon: ShoppingBag,   label: "Compras",            roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/sales",        icon: ClipboardList, label: "Ventas/Devoluciones",roles: ["ADMIN","JEFE","VENDEDOR"] },
   { to: "/shifts",       icon: Landmark,      label: "Control caja",       roles: ["ADMIN","JEFE"] },
   { to: "/dashboard",    icon: BarChart3,     label: "Dashboard",          roles: ["ADMIN","JEFE"] },

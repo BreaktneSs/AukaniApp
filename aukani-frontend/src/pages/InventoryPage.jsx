@@ -369,7 +369,7 @@ function MovementModal({ type, products, prefilledId, onClose, onSave }) {
 }
 
 // ── Drawer detalle de producto ────────────────────────────
-function ProductDrawer({ product, onClose, canExit, canEdit, onEntry, onExit, onEdit, onDelete }) {
+function ProductDrawer({ product, onClose, canEntry, canExit, canEdit, onEntry, onExit, onEdit, onDelete }) {
   const { data, isLoading } = useQuery({
     queryKey: ["movements-product", product.id],
     queryFn: () => inventoryService.getMovements({ productId: product.id, limit: 50 }),
@@ -444,8 +444,8 @@ function ProductDrawer({ product, onClose, canExit, canEdit, onEntry, onExit, on
         {/* Acciones — ocultar para servicios */}
         {product.type !== "SERVICE" && (
           <div className="flex gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-            <button onClick={() => onEntry(product.id)} className="btn-primary btn-sm flex-1"><Plus size={13} /> Entrada</button>
-            {canExit && <button onClick={() => onExit(product.id)} className="btn-sm flex-1 text-white" style={{ background: "var(--danger)" }}><Minus size={13} /> Salida</button>}
+            {canEntry && <button onClick={() => onEntry(product.id)} className="btn-primary btn-sm flex-1"><Plus size={13} /> Entrada</button>}
+            {canExit  && <button onClick={() => onExit(product.id)}  className="btn-sm flex-1 text-white" style={{ background: "var(--danger)" }}><Minus size={13} /> Salida</button>}
           </div>
         )}
 
@@ -505,8 +505,9 @@ export default function InventoryPage() {
   const [prefilledId, setPrefilledId] = useState(null)
   const { user } = useAuthStore()
   const qc = useQueryClient()
-  const canExit = ["ADMIN", "JEFE"].includes(user?.role)
-  const canEdit = ["ADMIN", "JEFE"].includes(user?.role)
+  const canEntry = user?.role === "ADMIN"
+  const canExit  = user?.role === "ADMIN"
+  const canEdit  = ["ADMIN", "JEFE"].includes(user?.role)
 
   const setFilter = useCallback((key, val) => setFilters(f => ({ ...f, [key]: val })), [])
   const activeFilterCount = [filters.categoryId, filters.minPrice, filters.maxPrice, filters.lowStock, filters.type].filter(Boolean).length
@@ -598,9 +599,11 @@ export default function InventoryPage() {
               <Plus size={15} /> Nuevo producto
             </button>
           )}
-          <button onClick={() => handleEntry()} className="btn-md" style={{ background: "var(--brand-light)", color: "var(--brand)", border: "1px solid var(--brand)" }}>
-            <Plus size={15} /> Entrada
-          </button>
+          {canEntry && (
+            <button onClick={() => handleEntry()} className="btn-md" style={{ background: "var(--brand-light)", color: "var(--brand)", border: "1px solid var(--brand)" }}>
+              <Plus size={15} /> Entrada
+            </button>
+          )}
           {canExit && (
             <button onClick={() => handleExit()} className="btn-md text-white" style={{ background: "var(--danger)" }}>
               <Minus size={15} /> Salida
@@ -751,7 +754,7 @@ export default function InventoryPage() {
       {/* Drawer de detalle */}
       {selectedProduct && (
         <ProductDrawer
-          product={selectedProduct} canExit={canExit} canEdit={canEdit}
+          product={selectedProduct} canEntry={canEntry} canExit={canExit} canEdit={canEdit}
           onClose={() => setSelectedProduct(null)}
           onEntry={handleEntry} onExit={handleExit}
           onEdit={handleEdit}

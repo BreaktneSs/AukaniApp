@@ -26,6 +26,8 @@ enum MovementType {
   ENTRY
   EXIT
   SALE
+  PURCHASE
+  PURCHASE_RETURN
 }
 
 enum ProductType {
@@ -55,6 +57,8 @@ model User {
   orders                Order[]
   movements             InventoryMovement[]
   expenses              Expense[]
+  purchases             Purchase[]
+  purchaseReturns       PurchaseReturn[]
   createdReservations   Reservation[] @relation("ReservationCreatedBy")
   completedReservations Reservation[] @relation("ReservationCompletedBy")
   cancelledReservations Reservation[] @relation("ReservationCancelledBy")
@@ -115,6 +119,8 @@ model Product {
   dispatchItems    DispatchItem[]
   accountItems     AccountItem[]
   reservationItems ReservationItem[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturnItems PurchaseReturnItem[]
 
   @@index([name])
   @@index([barcode])
@@ -225,6 +231,68 @@ model OrderPayment {
 
   order         Order         @relation(fields: [orderId], references: [id])
   paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+}
+
+// ─── COMPRAS ─────────────────────────────────────────────
+
+model Purchase {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  notes     String?
+  total     Decimal        @db.Decimal(10, 2)
+  createdAt DateTime       @default(now())
+
+  user    User             @relation(fields: [userId], references: [id])
+  items   PurchaseItem[]
+  returns PurchaseReturn[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PurchaseReturn {
+  id         Int                  @id @default(autoincrement())
+  purchaseId Int
+  userId     Int
+  notes      String?
+  total      Decimal              @db.Decimal(10, 2)
+  createdAt  DateTime             @default(now())
+
+  purchase Purchase             @relation(fields: [purchaseId], references: [id])
+  user     User                 @relation(fields: [userId], references: [id])
+  items    PurchaseReturnItem[]
+
+  @@index([purchaseId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PurchaseReturnItem {
+  id         Int     @id @default(autoincrement())
+  returnId   Int
+  productId  Int
+  quantity   Int
+  unitCost   Decimal @db.Decimal(10, 2)
+
+  return  PurchaseReturn @relation(fields: [returnId], references: [id])
+  product Product        @relation(fields: [productId], references: [id])
+
+  @@index([returnId])
+  @@index([productId])
+}
+
+model PurchaseItem {
+  id         Int     @id @default(autoincrement())
+  purchaseId Int
+  productId  Int
+  quantity   Int
+  unitCost   Decimal @db.Decimal(10, 2)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([purchaseId])
+  @@index([productId])
 }
 
 // ─── MOVIMIENTOS DE INVENTARIO ───────────────────────────
@@ -452,6 +520,8 @@ enum AuditAction {
   DISPATCH_CANCEL
   INVENTORY_ENTRY
   INVENTORY_EXIT
+  PURCHASE_CREATE
+  PURCHASE_RETURN_CREATE
   ACCOUNT_CREATE
   ACCOUNT_CLOSE
   ACCOUNT_ADD_ITEMS
@@ -472,6 +542,8 @@ enum AuditEntity {
   SUBSHIFT
   DISPATCH
   INVENTORY
+  PURCHASE
+  PURCHASE_RETURN
   ACCOUNT
   EXPENSE
   RESERVATION
