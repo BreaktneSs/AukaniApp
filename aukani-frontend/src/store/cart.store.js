@@ -123,10 +123,18 @@ export const useCartStore = create((set, get) => ({
     saveSales(updated, newActive, nextLocalNum)
   },
 
-  // Cierra la venta dada y siempre abre una nueva venta genérica, marcándola como flash
+  // Cierra la venta dada y navega a una genérica vacía existente o crea una nueva
   closeSaleAndNew: (id) => {
     const { sales, nextId, nextLocalNum } = get()
     const remaining = sales.filter(s => s.id !== id)
+
+    const emptyGeneric = remaining.find(s => s.type !== "account" && s.items.length === 0)
+    if (emptyGeneric) {
+      set({ sales: remaining, activeId: emptyGeneric.id, flashingTabId: emptyGeneric.id })
+      saveSales(remaining, emptyGeneric.id, nextLocalNum)
+      return
+    }
+
     const newId = nextId
     const fresh = createSale(newId, nextLocalNum)
     const updated = [...remaining, fresh]
