@@ -894,7 +894,15 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
         </div>
 
         {/* ── Formulario ── */}
-        <form onSubmit={e => { e.preventDefault(); onConfirm({ closingCash, notes }) }} className="px-6 py-4 space-y-3">
+        <form onSubmit={e => {
+          e.preventDefault()
+          const isNegative = difference !== null && difference < -0.01
+          if (isNegative && !notes.trim()) {
+            toast.error("Debes explicar el faltante en las notas")
+            return
+          }
+          onConfirm({ closingCash, notes })
+        }} className="px-6 py-4 space-y-3">
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "var(--text-secondary)" }}>
               Conteo de efectivo en caja
@@ -919,13 +927,34 @@ function CloseShiftModal({ shift, onClose, onConfirm, loading }) {
             </div>
           )}
 
+          {/* Aviso cuando hay faltante */}
+          {difference !== null && difference < -0.01 && (
+            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 animate-fade-in"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid var(--danger)" }}>
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" style={{ color: "var(--danger)" }} />
+              <p className="text-xs font-medium" style={{ color: "var(--danger)" }}>
+                Hay un faltante de {formatCOP(Math.abs(difference))}. Debes explicar el motivo en las notas para poder cerrar el turno.
+              </p>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              Notas
+            <label className="block text-xs font-bold uppercase tracking-widest mb-1.5"
+              style={{ color: difference !== null && difference < -0.01 ? "var(--danger)" : "var(--text-secondary)" }}>
+              Notas{difference !== null && difference < -0.01 ? " *" : ""}
             </label>
-            <textarea className="input resize-none" rows={2}
-              placeholder="Observaciones del turno..."
-              value={notes} onChange={e => setNotes(e.target.value)} />
+            <textarea
+              className="input resize-none"
+              rows={2}
+              placeholder={difference !== null && difference < -0.01
+                ? "Obligatorio: explica el motivo del faltante..."
+                : "Observaciones del turno..."}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              style={difference !== null && difference < -0.01 && !notes.trim()
+                ? { borderColor: "var(--danger)" }
+                : {}}
+            />
           </div>
 
           <div className="flex gap-2 pt-1">
