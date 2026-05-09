@@ -1195,6 +1195,11 @@ export default function POSPage() {
       const ctx = partialPayCtxRef.current
       partialPayCtxRef.current = null
       if (!ctx || ctx.willBeFullyPaid) {
+        if (ctx?.capturedBackendId) {
+          qc.setQueryData(["accounts-shift", shift?.id], (old = []) =>
+            (old || []).filter(a => a.id !== ctx.capturedBackendId)
+          )
+        }
         closeSaleAndNew(ctx?.capturedActiveId ?? activeId)
       } else {
         // Pago parcial: reducir cantidades locales pagadas
@@ -1256,13 +1261,14 @@ export default function POSPage() {
         ...(i.originalPrice != null && { customPrice: i.price }),
         ...(i.priceNote && { priceNote: i.priceNote }),
       })),
-      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity, alreadyDecremented: true })),
+      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity, alreadyDecremented: true, customPrice: i.price })),
     ]
     const accountItemUpdates = payingRemoteItems
       .filter(i => i.accountItemId)
       .map(i => ({ id: i.accountItemId, quantityPaid: i.quantity }))
     partialPayCtxRef.current = {
       capturedActiveId: activeId,
+      capturedBackendId: isAccount ? active?.backendId : null,
       localItemsContext: payingLocalItems.map(pi => {
         const orig = items.find(i => i.id === pi.id)
         return { id: pi.id, paidQty: pi.quantity, totalQty: orig?.quantity || pi.quantity }
