@@ -1282,6 +1282,7 @@ export default function POSPage() {
       ...(active?.type === "account" && active?.backendId && {
         accountId: active.backendId,
         accountItemUpdates,
+        closeAccount: willBeFullyPaid,
       }),
     })
   }
