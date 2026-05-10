@@ -5,8 +5,8 @@ const ip = (req) => req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req
 
 export const orderController = {
   async createSale(req, reply) {
-    const { items, payments, shiftId, accountId } = req.body
-    const order = await orderService.createSale({ items, payments, userId: req.user.id, shiftId, accountId: accountId || null })
+    const { items, payments, shiftId, accountId, accountItemUpdates, closeAccount } = req.body
+    const order = await orderService.createSale({ items, payments, userId: req.user.id, shiftId, accountId: accountId || null, accountItemUpdates, closeAccount: !!closeAccount })
     auditService.log({
       userId: req.user.id, userName: req.user.name, userRole: req.user.role,
       action: "SALE_CREATE", entity: "ORDER", entityId: order.id,
