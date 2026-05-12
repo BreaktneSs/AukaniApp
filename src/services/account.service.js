@@ -127,10 +127,30 @@ export const accountService = {
     return prisma.accountItem.delete({ where: { id: item.id } })
   },
 
-  async close(id, tx = prisma) {
-    return tx.account.update({
-      where: { id },
-      data: { status: "CLOSED", closedAt: new Date() },
+  async close(id) {
+    return prisma.$transaction(async (tx) => {
+      const account = await tx.account.findUnique({
+        where: { id },
+        include: {
+          items: { include: { product: { select: { id: true, type: true } } } },
+        },
+      })
+      if (!account) throw { statusCode: 404, message: "Cuenta no encontrada" }
+
+      // Restaurar stock de productos físicos que quedaron en la cuenta
+      for (const item of account.items) {
+        if (item.product?.type !== "SERVICE") {
+          await tx.product.update({
+            where: { id: item.productId },
+            data:  { stock: { increment: item.quantity } },
+          })
+        }
+      }
+
+      return tx.account.update({
+        where: { id },
+        data:  { status: "CLOSED", closedAt: new Date() },
+      })
     })
   },
 }
