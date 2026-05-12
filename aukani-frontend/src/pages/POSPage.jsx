@@ -1154,6 +1154,7 @@ export default function POSPage() {
     mutationFn: (backendId) => accountsService.close(backendId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
+      qc.invalidateQueries({ queryKey: ["products-all"] })
     },
     onError: e => toast.error(e.response?.data?.error || "Error al cerrar cuenta"),
   })
