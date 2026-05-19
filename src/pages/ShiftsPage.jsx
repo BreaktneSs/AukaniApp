@@ -6,7 +6,7 @@ import { paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
 import {
   Users, Clock, DollarSign, TrendingUp,
-  Eye, Loader2, X, TrendingDown, Plus, Trash2
+  Eye, Loader2, X, TrendingDown, Plus, Trash2, LogOut, AlertTriangle
 } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import { confirm } from "@/components/ui/ConfirmDialog"
@@ -25,8 +25,115 @@ function ModalWrapper({ children, onClose }) {
   )
 }
 
+// ── Modal cierre forzado (admin) ──────────────────────────
+function ForceCloseModal({ shift, onClose, onConfirm, loading }) {
+  const [closingCash, setClosingCash] = useState("")
+  const [notes, setNotes] = useState("")
+
+  const totalSales = (shift.shiftPayments || []).reduce((s, p) => s + Number(p.total), 0)
+  const cashPayment = shift.shiftPayments?.find(p => p.paymentMethod?.name === "Efectivo")
+  const cashExpenses = (shift.expenses || [])
+    .filter(e => e.paymentMethod?.name === "Efectivo")
+    .reduce((s, e) => s + Number(e.amount), 0)
+  const expectedCash = Number(shift.openingCash) + Number(cashPayment?.total || 0) - cashExpenses
+  const cash = Number(closingCash.replace(/\D/g, "")) || 0
+  const diff = cash - expectedCash
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="card p-5 w-full max-w-sm animate-slide-up space-y-4"
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+              Cerrar turno #{shift.id}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{shift.user?.name}</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center">
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Aviso admin */}
+        <div className="flex items-start gap-2 rounded-lg p-3"
+          style={{ background: "var(--warning-light, #fff7ed)", border: "1px solid var(--warning, #f59e0b)" }}>
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" style={{ color: "var(--warning, #f59e0b)" }} />
+          <p className="text-xs" style={{ color: "var(--warning, #b45309)" }}>
+            Estás cerrando el turno de <strong>{shift.user?.name}</strong> como administrador.
+          </p>
+        </div>
+
+        {/* Resumen */}
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "Ventas", value: formatCOP(totalSales), color: "var(--brand)" },
+            { label: "Efectivo esperado", value: formatCOP(expectedCash), color: "var(--info)" },
+          ].map(item => (
+            <div key={item.label} className="rounded-lg p-2.5 text-center"
+              style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}>
+              <p className="text-xs mb-0.5" style={{ color: "var(--text-muted)" }}>{item.label}</p>
+              <p className="font-mono font-bold text-sm" style={{ color: item.color }}>{item.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Efectivo contado */}
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-secondary)" }}>
+            Efectivo contado en caja
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="0"
+            value={closingCash ? new Intl.NumberFormat("es-CO").format(Number(closingCash.replace(/\D/g, ""))) : ""}
+            onChange={e => setClosingCash(e.target.value.replace(/\D/g, ""))}
+            className="input w-full font-mono text-lg text-center"
+            autoFocus
+          />
+          {closingCash && (
+            <p className="text-xs mt-1 text-center font-mono"
+              style={{ color: diff >= 0 ? "var(--brand)" : "var(--danger)" }}>
+              {diff >= 0 ? "+" : ""}{formatCOP(diff)}
+            </p>
+          )}
+        </div>
+
+        {/* Notas */}
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-secondary)" }}>
+            Notas (opcional)
+          </label>
+          <textarea
+            rows={2}
+            className="input w-full resize-none text-sm"
+            placeholder="Motivo del cierre administrativo..."
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+          <button
+            disabled={loading || !closingCash}
+            onClick={() => onConfirm({ closingCash: cash, notes: notes.trim() || undefined })}
+            className="btn-md flex-1 font-semibold flex items-center justify-center gap-1.5"
+            style={{ background: "var(--danger)", color: "#fff", opacity: (!closingCash || loading) ? 0.5 : 1 }}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+            Cerrar turno
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Detalle de turno ──────────────────────────────────────
-function ShiftDetailModal({ shiftId, onClose }) {
+function ShiftDetailModal({ shiftId, onClose, onForceClose }) {
   const { data: shift, isLoading } = useQuery({
     queryKey: ["shift-detail", shiftId],
     queryFn: () => shiftsService.getById(shiftId),
@@ -74,6 +181,15 @@ function ShiftDetailModal({ shiftId, onClose }) {
             style={{ background: isOpen ? "var(--brand-light)" : "var(--bg-tertiary)", color: isOpen ? "var(--brand)" : "var(--text-muted)" }}>
             {isOpen ? "Abierto" : "Cerrado"}
           </span>
+          {isOpen && onForceClose && (
+            <button
+              onClick={() => onForceClose(shift)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+              style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
+              <LogOut size={11} />
+              Cerrar
+            </button>
+          )}
           <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center"><X size={15} /></button>
         </div>
       </div>
@@ -139,23 +255,54 @@ function ShiftDetailModal({ shiftId, onClose }) {
         <div className="card overflow-hidden">
           <div className="px-4 py-2.5 border-b" style={{ borderColor: "var(--border)" }}>
             <p className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
-              {shift.orders.length} ventas en este turno
+              {shift.orders.length} venta{shift.orders.length !== 1 ? "s" : ""} en este turno
             </p>
           </div>
-          <div className="max-h-48 overflow-y-auto divide-y" style={{ borderColor: "var(--border)" }}>
-            {shift.orders.map(order => (
-              <div key={order.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <div>
-                  <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>#{order.id}</span>
-                  <span className="mx-2" style={{ color: "var(--text-secondary)" }}>{new Date(order.createdAt).toLocaleTimeString()}</span>
-                  <span className="badge text-xs"
-                    style={{ background: order.status === "COMPLETED" ? "var(--brand-light)" : "var(--danger-light)", color: order.status === "COMPLETED" ? "var(--brand)" : "var(--danger)" }}>
-                    {order.status === "COMPLETED" ? "OK" : order.status === "PARTIAL_REFUND" ? "Dev. parcial" : "Cancelada"}
-                  </span>
+          <div className="max-h-64 overflow-y-auto divide-y" style={{ borderColor: "var(--border)" }}>
+            {shift.orders.map(order => {
+              const statusColor = order.status === "COMPLETED" ? "var(--brand)" : "var(--danger)"
+              const statusBg   = order.status === "COMPLETED" ? "var(--brand-light)" : "var(--danger-light)"
+              const statusLabel = order.status === "COMPLETED" ? "OK" : order.status === "PARTIAL_REFUND" ? "Dev. parcial" : "Cancelada"
+              return (
+                <div key={order.id} className="px-4 py-2.5">
+                  {/* Cabecera de la orden */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>#{order.id}</span>
+                      <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                        {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="badge text-xs" style={{ background: statusBg, color: statusColor }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-sm" style={{ color: "var(--brand)" }}>
+                      {formatCOP(order.total)}
+                    </span>
+                  </div>
+                  {/* Productos */}
+                  {order.items?.length > 0 && (
+                    <div className="mt-1.5 space-y-0.5 pl-2 border-l-2" style={{ borderColor: "var(--border)" }}>
+                      {order.items.map(item => (
+                        <div key={item.id} className="flex items-center justify-between">
+                          <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+                            {item.quantity > 1 && (
+                              <span className="font-mono font-semibold mr-1" style={{ color: "var(--text-muted)" }}>
+                                {item.quantity}×
+                              </span>
+                            )}
+                            {item.product?.name || "—"}
+                          </span>
+                          <span className="text-xs font-mono ml-3 shrink-0" style={{ color: "var(--text-muted)" }}>
+                            {formatCOP(Number(item.price) * item.quantity)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className="font-mono font-bold" style={{ color: "var(--brand)" }}>{formatCOP(order.total)}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -171,7 +318,7 @@ function ShiftDetailModal({ shiftId, onClose }) {
 }
 
 // ── Tarjeta de turno activo ───────────────────────────────
-function ActiveShiftCard({ shift, onView }) {
+function ActiveShiftCard({ shift, onView, onForceClose }) {
   const totalSales = (shift.shiftPayments || []).reduce((s, p) => s + Number(p.total), 0)
   const totalExpenses = (shift.expenses || []).reduce((s, e) => s + Number(e.amount), 0)
   const cashPayment = shift.shiftPayments?.find(p => p.paymentMethod?.name === "Efectivo")
@@ -195,9 +342,18 @@ function ActiveShiftCard({ shift, onView }) {
             Desde {new Date(shift.openedAt).toLocaleTimeString()} · {hours > 0 ? `${hours}h ` : ""}{mins}min
           </p>
         </div>
-        <button onClick={() => onView(shift.id)} className="btn-ghost w-7 h-7 rounded flex items-center justify-center">
-          <Eye size={14} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onForceClose(shift)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+            style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid var(--danger)" }}>
+            <LogOut size={11} />
+            Cerrar
+          </button>
+          <button onClick={() => onView(shift.id)} className="btn-ghost w-7 h-7 rounded flex items-center justify-center">
+            <Eye size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -478,7 +634,23 @@ const TABS = ["Turnos activos", "Egresos", "Historial"]
 export default function ShiftsPage() {
   const [activeTab, setActiveTab] = useState("Turnos activos")
   const [detailId, setDetailId] = useState(null)
+  const [forceCloseShift, setForceCloseShift] = useState(null) // shift object to force-close
   const [page, setPage] = useState(1)
+  const qcPage = useQueryClient()
+
+  const closeShiftMut = useMutation({
+    mutationFn: ({ id, data }) => shiftsService.close(id, data),
+    onSuccess: () => {
+      toast.success("Turno cerrado")
+      setForceCloseShift(null)
+      setDetailId(null)
+      qcPage.invalidateQueries({ queryKey: ["shifts-active"] })
+      qcPage.invalidateQueries({ queryKey: ["shifts-history"] })
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error al cerrar turno"),
+  })
+
+  const handleForceClose = (shift) => setForceCloseShift(shift)
 
   const { data: activeShifts = [], isLoading: loadingActive, refetch: refetchActive } = useQuery({
     queryKey: ["shifts-active"],
@@ -589,7 +761,7 @@ export default function ShiftsPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {activeShifts.map(shift => (
-                  <ActiveShiftCard key={shift.id} shift={shift} onView={setDetailId} />
+                  <ActiveShiftCard key={shift.id} shift={shift} onView={setDetailId} onForceClose={handleForceClose} />
                 ))}
               </div>
             )}
@@ -674,7 +846,22 @@ export default function ShiftsPage() {
         </div>
       )}
 
-      {detailId && <ShiftDetailModal shiftId={detailId} onClose={() => setDetailId(null)} />}
+      {detailId && (
+        <ShiftDetailModal
+          shiftId={detailId}
+          onClose={() => setDetailId(null)}
+          onForceClose={(shift) => { setDetailId(null); setForceCloseShift(shift) }}
+        />
+      )}
+
+      {forceCloseShift && (
+        <ForceCloseModal
+          shift={forceCloseShift}
+          onClose={() => setForceCloseShift(null)}
+          loading={closeShiftMut.isPending}
+          onConfirm={(data) => closeShiftMut.mutate({ id: forceCloseShift.id, data })}
+        />
+      )}
     </div>
   )
 }

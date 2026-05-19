@@ -1,14 +1,16 @@
 import axios from "axios"
+import { getDeviceId } from "@/utils/device.js"
 
 const api = axios.create({
   baseURL: "/api",
   timeout: 10000,
 })
 
-// Inyectar token en cada request
+// Inyectar token y deviceId en cada request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("aukani_token")
   if (token) config.headers.Authorization = `Bearer ${token}`
+  config.headers["X-Device-Id"] = getDeviceId()
   return config
 })
 

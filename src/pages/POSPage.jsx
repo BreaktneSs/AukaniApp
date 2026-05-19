@@ -579,9 +579,11 @@ function CloseAccountWarningModal({ account, onConfirm, onClose }) {
 // ── Pantalla apertura de turno ────────────────────────────
 // ── Contador de billetes y monedas ───────────────────────
 const BILLS = [100000, 50000, 20000, 10000, 5000, 2000]
+const COINS = [1000, 500, 400, 300, 200, 100]
 
 function BillCounter({ onChange, storageKey }) {
   const { touchMode } = useUiStore()
+
   const [counts, setCounts] = useState(() => {
     if (storageKey) {
       try {
@@ -591,120 +593,133 @@ function BillCounter({ onChange, storageKey }) {
     }
     return Object.fromEntries(BILLS.map(b => [b, 0]))
   })
-  const [coinsRaw, setCoinsRaw] = useState(() => {
+
+  const [coinCounts, setCoinCounts] = useState(() => {
     if (storageKey) {
       try {
         const stored = sessionStorage.getItem(storageKey)
-        if (stored) return JSON.parse(stored).coinsRaw || ""
+        if (stored) return JSON.parse(stored).coinCounts || Object.fromEntries(COINS.map(c => [c, 0]))
       } catch {}
     }
-    return ""
+    return Object.fromEntries(COINS.map(c => [c, 0]))
   })
-  const [numPad, setNumPad] = useState(null) // { bill: number|"coins" }
 
-  const coins = Number(coinsRaw) || 0
+  const [numPad, setNumPad] = useState(null) // { denom: number, isCoin: bool }
+
   const billsTotal = BILLS.reduce((s, b) => s + b * (counts[b] || 0), 0)
-  const total = billsTotal + coins
+  const coinsTotal = COINS.reduce((s, c) => s + c * (coinCounts[c] || 0), 0)
+  const total = billsTotal + coinsTotal
 
   useEffect(() => { onChange(total) }, [total])
 
   useEffect(() => {
     if (!storageKey) return
-    try { sessionStorage.setItem(storageKey, JSON.stringify({ counts, coinsRaw })) } catch {}
-  }, [counts, coinsRaw, storageKey])
+    try { sessionStorage.setItem(storageKey, JSON.stringify({ counts, coinCounts })) } catch {}
+  }, [counts, coinCounts, storageKey])
 
-  const adjust = (bill, delta) =>
+  const adjustBill = (bill, delta) =>
     setCounts(prev => ({ ...prev, [bill]: Math.max(0, (prev[bill] || 0) + delta) }))
-
-  const setCount = (bill, val) => {
+  const setBillCount = (bill, val) => {
     const n = parseInt(String(val).replace(/\D/g, "")) || 0
     setCounts(prev => ({ ...prev, [bill]: n }))
   }
 
+  const adjustCoin = (coin, delta) =>
+    setCoinCounts(prev => ({ ...prev, [coin]: Math.max(0, (prev[coin] || 0) + delta) }))
+  const setCoinCount = (coin, val) => {
+    const n = parseInt(String(val).replace(/\D/g, "")) || 0
+    setCoinCounts(prev => ({ ...prev, [coin]: n }))
+  }
+
+  const DenomRow = ({ denom, qty, subtotal, onMinus, onPlus, onInput, onTouchTap, small }) => (
+    <div className="flex items-center gap-2 py-1 rounded-lg px-1"
+      style={{ background: qty > 0 ? "var(--brand-light)" : "transparent" }}>
+      <span className={`font-mono font-semibold text-right shrink-0 ${small ? "w-16 text-xs" : "w-20 text-xs"}`}
+        style={{ color: "var(--text-secondary)" }}>
+        {formatCOP(denom)}
+      </span>
+      <button type="button" onClick={onMinus}
+        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-base select-none"
+        style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+        −
+      </button>
+      {touchMode ? (
+        <button type="button"
+          className="w-12 text-center text-sm font-mono font-bold rounded-lg border select-none"
+          style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)", padding: "4px 0" }}
+          onClick={onTouchTap}>
+          {qty || "0"}
+        </button>
+      ) : (
+        <input
+          type="text" inputMode="numeric"
+          className="w-12 text-center text-sm font-mono font-bold rounded-lg border"
+          style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)", padding: "4px 0" }}
+          value={qty || ""}
+          placeholder="0"
+          onChange={e => onInput(e.target.value)}
+          onFocus={e => e.target.select()}
+        />
+      )}
+      <button type="button" onClick={onPlus}
+        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-base select-none"
+        style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+        +
+      </button>
+      <span className="text-xs font-mono ml-auto shrink-0"
+        style={{ color: qty > 0 ? "var(--brand)" : "var(--text-muted)" }}>
+        {qty > 0 ? formatCOP(subtotal) : "—"}
+      </span>
+    </div>
+  )
+
   return (
     <div className="space-y-1">
-      {BILLS.map(bill => {
-        const qty = counts[bill] || 0
-        const subtotal = bill * qty
-        return (
-          <div key={bill} className="flex items-center gap-2 py-1 rounded-lg px-1"
-            style={{ background: qty > 0 ? "var(--brand-light)" : "transparent" }}>
-            <span className="text-xs font-mono font-semibold w-20 text-right shrink-0"
-              style={{ color: "var(--text-secondary)" }}>
-              {formatCOP(bill)}
-            </span>
-            <button type="button" onClick={() => adjust(bill, -1)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-base select-none"
-              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
-              −
-            </button>
-            {touchMode ? (
-              <button type="button"
-                className="w-12 text-center text-sm font-mono font-bold rounded-lg border select-none"
-                style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)", padding: "4px 0" }}
-                onClick={() => setNumPad({ bill, mode: "quantity" })}>
-                {qty || "0"}
-              </button>
-            ) : (
-              <input
-                type="text" inputMode="numeric"
-                className="w-12 text-center text-sm font-mono font-bold rounded-lg border"
-                style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)", padding: "4px 0" }}
-                value={qty || ""}
-                placeholder="0"
-                onChange={e => setCount(bill, e.target.value)}
-                onFocus={e => e.target.select()}
-              />
-            )}
-            <button type="button" onClick={() => adjust(bill, 1)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-bold text-base select-none"
-              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
-              +
-            </button>
-            <span className="text-xs font-mono ml-auto shrink-0"
-              style={{ color: qty > 0 ? "var(--brand)" : "var(--text-muted)" }}>
-              {qty > 0 ? formatCOP(subtotal) : "—"}
-            </span>
-          </div>
-        )
-      })}
+      {/* Billetes */}
+      {BILLS.map(bill => (
+        <DenomRow
+          key={bill}
+          denom={bill}
+          qty={counts[bill] || 0}
+          subtotal={bill * (counts[bill] || 0)}
+          onMinus={() => adjustBill(bill, -1)}
+          onPlus={() => adjustBill(bill, 1)}
+          onInput={v => setBillCount(bill, v)}
+          onTouchTap={() => setNumPad({ denom: bill, isCoin: false })}
+        />
+      ))}
 
       {/* Monedas */}
-      <div className="flex items-center gap-2 pt-2 mt-1 border-t" style={{ borderColor: "var(--border)" }}>
-        <span className="text-xs font-semibold w-20 text-right shrink-0" style={{ color: "var(--text-secondary)" }}>
+      <div className="pt-2 mt-1 border-t space-y-1" style={{ borderColor: "var(--border)" }}>
+        <p className="text-xs font-bold uppercase tracking-widest px-1 pb-0.5" style={{ color: "var(--text-muted)" }}>
           Monedas
-        </span>
-        <div className="flex-1 relative">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono"
-            style={{ color: "var(--text-muted)" }}>$</span>
-          {touchMode ? (
-            <button type="button"
-              className="input pl-6 w-full text-sm font-mono text-left select-none"
-              onClick={() => setNumPad({ bill: "coins", mode: "currency" })}>
-              {coins > 0 ? formatNumber(coins) : <span style={{ color: "var(--text-muted)" }}>0</span>}
-            </button>
-          ) : (
-            <input
-              type="text" inputMode="numeric" placeholder="0"
-              className="input pl-6 w-full text-sm font-mono"
-              value={coinsRaw ? formatNumber(coins) : ""}
-              onChange={e => setCoinsRaw(e.target.value.replace(/\D/g, ""))}
-            />
-          )}
-        </div>
+        </p>
+        {COINS.map(coin => (
+          <DenomRow
+            key={coin}
+            denom={coin}
+            qty={coinCounts[coin] || 0}
+            subtotal={coin * (coinCounts[coin] || 0)}
+            onMinus={() => adjustCoin(coin, -1)}
+            onPlus={() => adjustCoin(coin, 1)}
+            onInput={v => setCoinCount(coin, v)}
+            onTouchTap={() => setNumPad({ denom: coin, isCoin: true })}
+            small
+          />
+        ))}
       </div>
 
       {/* NumPad touch */}
       {numPad && (
         <NumPad
-          mode={numPad.mode}
+          mode="quantity"
           minValue={0}
-          initialValue={numPad.bill === "coins" ? coins : (counts[numPad.bill] || 0)}
-          label={numPad.bill === "coins" ? "Monedas" : formatCOP(numPad.bill)}
-          subtitle={numPad.bill !== "coins" ? `Subtotal: ${formatCOP(numPad.bill * (counts[numPad.bill] || 0))}` : undefined}
+          initialValue={numPad.isCoin ? (coinCounts[numPad.denom] || 0) : (counts[numPad.denom] || 0)}
+          label={formatCOP(numPad.denom)}
+          subtitle={`Subtotal: ${formatCOP(numPad.denom * (numPad.isCoin ? (coinCounts[numPad.denom] || 0) : (counts[numPad.denom] || 0)))}`}
           onConfirm={(val) => {
-            if (numPad.bill === "coins") setCoinsRaw(String(val))
-            else setCount(numPad.bill, val)
+            if (numPad.isCoin) setCoinCount(numPad.denom, val)
+            else setBillCount(numPad.denom, val)
             setNumPad(null)
           }}
           onClose={() => setNumPad(null)}
@@ -987,6 +1002,7 @@ export default function POSPage() {
   const [partialSelection, setPartialSelection] = useState(null) // { payingLocal, payingRemote } | null
   const partialPayCtxRef = useRef(null)
   const { touchMode } = useUiStore()
+  const { user } = useAuthStore()
   const searchRef = useRef(null)
   const qc = useQueryClient()
 
@@ -1008,12 +1024,13 @@ export default function POSPage() {
 
   // Turno
   const { data: shift, isLoading: shiftLoading, refetch: refetchShift } = useQuery({
-    queryKey: ["shift-mine"],
-    queryFn: shiftsService.getMine,
+    queryKey: ["shift-active"],
+    queryFn: shiftsService.getActive,
     retry: false,
     refetchOnWindowFocus: false,
-    refetchInterval: 60_000, // Actualiza cada minuto automáticamente
+    refetchInterval: 60_000,
   })
+  const canCloseShift = user?.role === "ADMIN" || user?.role === "JEFE" || shift?.userId === user?.id
   useEffect(() => {
     if (shift?.id) {
       // Solo sincronizar el shiftId en el store, sin tocar las ventas
@@ -1115,7 +1132,7 @@ export default function POSPage() {
     onSuccess: (data) => {
       sessionStorage.removeItem("aukani-open-shift")
       resetForNewShift(data.id)
-      qc.invalidateQueries({ queryKey: ["shift-mine"] })
+      qc.invalidateQueries({ queryKey: ["shift-active"] })
       toast.success("Turno abierto")
     },
     onError: e => toast.error(e.response?.data?.error || "Error"),
@@ -1129,8 +1146,8 @@ export default function POSPage() {
       setShowCloseShift(false)
       setShowPayment(false)
       // Invalidar y forzar refetch para que aparezca la pantalla de apertura
-      qc.removeQueries({ queryKey: ["shift-mine"] })
-      qc.invalidateQueries({ queryKey: ["shift-mine"] })
+      qc.removeQueries({ queryKey: ["shift-active"] })
+      qc.invalidateQueries({ queryKey: ["shift-active"] })
       toast.success("Turno cerrado correctamente")
     },
     onError: (e) => {
@@ -1140,8 +1157,8 @@ export default function POSPage() {
         useCartStore.setState({ shiftId: null })
         setShowCloseShift(false)
         setShowPayment(false)
-        qc.removeQueries({ queryKey: ["shift-mine"] })
-        qc.invalidateQueries({ queryKey: ["shift-mine"] })
+        qc.removeQueries({ queryKey: ["shift-active"] })
+        qc.invalidateQueries({ queryKey: ["shift-active"] })
         toast.success("Turno cerrado correctamente")
       } else {
         toast.error(msg || "Error al cerrar turno")
@@ -1213,7 +1230,7 @@ export default function POSPage() {
       }
       setShowPayment(false)
       qc.invalidateQueries({ queryKey: ["products-all"] })
-      qc.invalidateQueries({ queryKey: ["shift-mine"] })
+      qc.invalidateQueries({ queryKey: ["shift-active"] })
       qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
     },
     onError: e => toast.error(e.response?.data?.error || "Error al registrar venta"),
@@ -1354,6 +1371,7 @@ export default function POSPage() {
               )}
             </button>
 
+            {canCloseShift && (
             <button
               onClick={() => {
                 if (openAccounts.length > 0) {
@@ -1373,6 +1391,7 @@ export default function POSPage() {
                 </span>
               )}
             </button>
+            )}
           </div>
 
           {/* Chips de categorías */}
