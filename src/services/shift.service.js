@@ -1,114 +1,126 @@
 import prisma from "../config/prisma.js"
 
+const SHIFT_INCLUDE = {
+  user: { select: { id: true, name: true } },
+  shiftPayments: { include: { paymentMethod: true } },
+  _count: { select: { orders: true } },
+  orders: {
+    where: { status: { in: ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"] } },
+    select: {
+      payments: {
+        select: {
+          amount: true,
+          paymentMethod: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
+  expenses: {
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: { select: { id: true, name: true } },
+      paymentMethod: { select: { id: true, name: true } },
+    },
+  },
+  completedReservations: {
+    where: { status: "COMPLETED" },
+    select: {
+      id: true,
+      depositAmount: true,
+      depositMethodId: true,
+      depositMethod:  { select: { id: true, name: true } },
+      remainingAmount: true,
+      remainingMethodId: true,
+      remainingMethod: { select: { id: true, name: true } },
+    },
+  },
+  cancelledReservations: {
+    where: { status: "CANCELLED" },
+    select: {
+      id: true,
+      depositAmount: true,
+      depositMethodId: true,
+      depositMethod:  { select: { id: true, name: true } },
+      refundPct: true,
+    },
+  },
+}
+
+function enrichOpenShift(shift) {
+  if (!shift) return null
+
+  const livePaymentTotals = {}
+
+  for (const order of shift.orders || []) {
+    for (const payment of order.payments || []) {
+      const id = payment.paymentMethod?.id
+      if (!livePaymentTotals[id]) {
+        livePaymentTotals[id] = { total: 0, paymentMethod: payment.paymentMethod }
+      }
+      livePaymentTotals[id].total += Number(payment.amount)
+    }
+  }
+
+  for (const res of shift.completedReservations || []) {
+    if (res.depositMethodId && res.depositAmount) {
+      const id = res.depositMethodId
+      if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.depositMethod }
+      livePaymentTotals[id].total += Number(res.depositAmount)
+    }
+    if (res.remainingMethodId && res.remainingAmount) {
+      const id = res.remainingMethodId
+      if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.remainingMethod }
+      livePaymentTotals[id].total += Number(res.remainingAmount)
+    }
+  }
+
+  for (const res of shift.cancelledReservations || []) {
+    const retentionPct = 100 - (res.refundPct ?? 0)
+    const retentionAmount = Math.round(Number(res.depositAmount) * retentionPct) / 100
+    if (retentionAmount > 0 && res.depositMethodId) {
+      const id = res.depositMethodId
+      if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.depositMethod }
+      livePaymentTotals[id].total += retentionAmount
+    }
+  }
+
+  const liveShiftPayments = Object.entries(livePaymentTotals).map(([id, data]) => ({
+    id: `live-${id}`,
+    paymentMethodId: Number(id),
+    total: data.total,
+    paymentMethod: data.paymentMethod,
+  }))
+
+  const { orders, expenses, completedReservations, cancelledReservations, ...rest } = shift
+  return { ...rest, shiftPayments: liveShiftPayments, expenses: expenses || [] }
+}
+
 export const shiftService = {
   async getOpenShift(userId) {
     const shift = await prisma.shift.findFirst({
       where: { userId, status: "OPEN" },
-      include: {
-        user: { select: { id: true, name: true } },
-        shiftPayments: { include: { paymentMethod: true } },
-        _count: { select: { orders: true } },
-        orders: {
-          where: { status: { in: ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"] } },
-          select: {
-            payments: {
-              select: {
-                amount: true,
-                paymentMethod: { select: { id: true, name: true } },
-              },
-            },
-          },
-        },
-        expenses: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            user: { select: { id: true, name: true } },
-            paymentMethod: { select: { id: true, name: true } },
-          },
-        },
-        completedReservations: {
-          where: { status: "COMPLETED" },
-          select: {
-            id: true,
-            depositAmount: true,
-            depositMethodId: true,
-            depositMethod:  { select: { id: true, name: true } },
-            remainingAmount: true,
-            remainingMethodId: true,
-            remainingMethod: { select: { id: true, name: true } },
-          },
-        },
-        cancelledReservations: {
-          where: { status: "CANCELLED" },
-          select: {
-            id: true,
-            depositAmount: true,
-            depositMethodId: true,
-            depositMethod:  { select: { id: true, name: true } },
-            refundPct: true,
-          },
-        },
-      },
+      include: SHIFT_INCLUDE,
     })
-
-    if (!shift) return null
-
-    // Calcular shiftPayments en tiempo real desde las órdenes
-    const livePaymentTotals = {}
-    for (const order of shift.orders || []) {
-      for (const payment of order.payments || []) {
-        const id = payment.paymentMethod?.id
-        if (!livePaymentTotals[id]) {
-          livePaymentTotals[id] = { total: 0, paymentMethod: payment.paymentMethod }
-        }
-        livePaymentTotals[id].total += Number(payment.amount)
-      }
-    }
-
-    // Reservas completadas: sumar abono (depositAmount) + restante (remainingAmount) por sus métodos
-    for (const res of shift.completedReservations || []) {
-      if (res.depositMethodId && res.depositAmount) {
-        const id = res.depositMethodId
-        if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.depositMethod }
-        livePaymentTotals[id].total += Number(res.depositAmount)
-      }
-      if (res.remainingMethodId && res.remainingAmount) {
-        const id = res.remainingMethodId
-        if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.remainingMethod }
-        livePaymentTotals[id].total += Number(res.remainingAmount)
-      }
-    }
-
-    // Reservas canceladas: sumar solo la retención (depositAmount × (100 - refundPct) / 100)
-    // El reembolso sale del fondo del abono, nunca estuvo en caja
-    for (const res of shift.cancelledReservations || []) {
-      const retentionPct = 100 - (res.refundPct ?? 0)
-      const retentionAmount = Math.round(Number(res.depositAmount) * retentionPct) / 100
-      if (retentionAmount > 0 && res.depositMethodId) {
-        const id = res.depositMethodId
-        if (!livePaymentTotals[id]) livePaymentTotals[id] = { total: 0, paymentMethod: res.depositMethod }
-        livePaymentTotals[id].total += retentionAmount
-      }
-    }
-
-    const liveShiftPayments = Object.entries(livePaymentTotals).map(([id, data]) => ({
-      id: `live-${id}`,
-      paymentMethodId: Number(id),
-      total: data.total,
-      paymentMethod: data.paymentMethod,
-    }))
-
-    const { orders, expenses, completedReservations, cancelledReservations, ...rest } = shift
-    return { ...rest, shiftPayments: liveShiftPayments, expenses: expenses || [] }
+    return enrichOpenShift(shift)
   },
 
-  async openShift(userId, openingCash) {
-    const existing = await this.getOpenShift(userId)
-    if (existing) throw { statusCode: 409, message: "Ya tienes un turno abierto" }
-    return prisma.shift.create({ data: { userId, openingCash } })
+  async getOpenByDevice(deviceId) {
+    const shift = await prisma.shift.findFirst({
+      where: { deviceId, status: "OPEN" },
+      include: SHIFT_INCLUDE,
+    })
+    return enrichOpenShift(shift)
   },
 
-  async closeShift(shiftId, userId, { closingCash, notes }) {
+  async openShift(userId, openingCash, deviceId, deviceIp) {
+    if (deviceId) {
+      const existing = await this.getOpenByDevice(deviceId)
+      if (existing) throw { statusCode: 409, message: "Ya hay un turno abierto en este dispositivo" }
+    }
+    return prisma.shift.create({ data: { userId, openingCash, deviceId: deviceId || null, deviceIp: deviceIp || null } })
+  },
+
+  async closeShift(shiftId, userId, role, { closingCash, notes }) {
     const shift = await prisma.shift.findUnique({
       where: { id: shiftId },
       include: {
@@ -118,10 +130,13 @@ export const shiftService = {
     })
 
     if (!shift) throw { statusCode: 404, message: "Turno no encontrado" }
-    if (shift.userId !== userId) throw { statusCode: 403, message: "No puedes cerrar el turno de otro cajero" }
     if (shift.status === "CLOSED") throw { statusCode: 409, message: "El turno ya está cerrado" }
 
-    // Ventas netas por método de pago (incluye devoluciones negativas, NO egresos)
+    const isAdmin = role === "ADMIN" || role === "JEFE"
+    if (!isAdmin && shift.userId !== userId) {
+      throw { statusCode: 403, message: "No puedes cerrar el turno de otro cajero" }
+    }
+
     const paymentTotals = {}
     for (const order of shift.orders) {
       for (const payment of order.payments) {
@@ -129,7 +144,6 @@ export const shiftService = {
       }
     }
 
-    // Reservas completadas: abono + restante por sus métodos
     const completedReservations = await prisma.reservation.findMany({
       where: { completedShiftId: shiftId, status: "COMPLETED" },
       select: { depositAmount: true, depositMethodId: true, remainingAmount: true, remainingMethodId: true },
@@ -143,7 +157,6 @@ export const shiftService = {
       }
     }
 
-    // Reservas canceladas: solo la retención entra a caja
     const cancelledReservations = await prisma.reservation.findMany({
       where: { cancelledShiftId: shiftId, status: "CANCELLED" },
       select: { depositAmount: true, depositMethodId: true, refundPct: true },
@@ -156,7 +169,6 @@ export const shiftService = {
       }
     }
 
-    // Egresos: solo para calcular expectedCash, no tocan shiftPayments
     const expenses = await prisma.expense.findMany({ where: { shiftId } })
     const cashMethod = await prisma.paymentMethod.findFirst({ where: { name: "Efectivo" } })
     const cashSales = paymentTotals[cashMethod?.id] || 0
@@ -172,14 +184,12 @@ export const shiftService = {
       total,
     }))
 
-    // Cerrar sub-turnos (cajas remotas) asociados a esta caja
     const openSubShifts = await prisma.subShift.findMany({
       where: { parentShiftId: shiftId, status: "OPEN" },
       select: { id: true },
     })
 
     const [closedShift] = await prisma.$transaction([
-      // Cerrar la caja principal
       prisma.shift.update({
         where: { id: shiftId },
         data: { status: "CLOSED", closingCash, expectedCash, difference, notes, closedAt: new Date() },
@@ -188,12 +198,10 @@ export const shiftService = {
           user: { select: { id: true, name: true } },
         },
       }),
-      // Cerrar todos los sub-turnos abiertos
       prisma.subShift.updateMany({
         where: { parentShiftId: shiftId, status: "OPEN" },
         data: { status: "CLOSED", closedAt: new Date() },
       }),
-      // Cancelar pedidos pendientes de despacho de esas cajas remotas
       prisma.dispatchOrder.updateMany({
         where: {
           subShiftId: { in: openSubShifts.map(s => s.id) },
@@ -201,7 +209,6 @@ export const shiftService = {
         },
         data: { status: "CANCELLED" },
       }),
-      // Upsert shiftPayments
       ...shiftPaymentData.map((sp) =>
         prisma.shiftPayment.upsert({
           where: { shiftId_paymentMethodId: { shiftId: sp.shiftId, paymentMethodId: sp.paymentMethodId } },
@@ -228,7 +235,6 @@ export const shiftService = {
           user: { select: { id: true, name: true } },
           shiftPayments: { include: { paymentMethod: true } },
           _count: { select: { orders: true } },
-          // Para turnos abiertos: calcular ventas en tiempo real desde las órdenes
           orders: {
             where: { status: { in: ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"] } },
             select: {
@@ -245,19 +251,15 @@ export const shiftService = {
       prisma.shift.count({ where }),
     ])
 
-    // Enriquecer cada turno con totales calculados en tiempo real
     const enriched = shifts.map(shift => {
-      // Si está cerrado, usar shiftPayments ya guardados
       if (shift.status === "CLOSED") {
         const { orders, ...rest } = shift
         return rest
       }
 
-      // Si está abierto, calcular desde las órdenes actuales
       const livePaymentTotals = {}
       for (const order of shift.orders || []) {
         for (const payment of order.payments || []) {
-          const key = payment.paymentMethod?.name || "Otro"
           const methodId = payment.paymentMethod?.id
           if (!livePaymentTotals[methodId]) {
             livePaymentTotals[methodId] = { total: 0, paymentMethod: payment.paymentMethod }
@@ -306,7 +308,6 @@ export const shiftService = {
 
     if (!shift) return null
 
-    // Si está abierto, calcular shiftPayments en tiempo real
     if (shift.status === "OPEN") {
       const livePaymentTotals = {}
       for (const order of shift.orders.filter(o => ["COMPLETED", "PARTIAL_REFUND", "REFUNDED"].includes(o.status))) {

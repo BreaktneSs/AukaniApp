@@ -133,6 +133,8 @@ model Product {
 model Shift {
   id           Int         @id @default(autoincrement())
   userId       Int
+  deviceId     String?
+  deviceIp     String?
   status       ShiftStatus @default(OPEN)
   openingCash  Decimal     @db.Decimal(10, 2)
   closingCash  Decimal?    @db.Decimal(10, 2)
@@ -154,6 +156,7 @@ model Shift {
   @@index([userId])
   @@index([status])
   @@index([openedAt])
+  @@index([deviceId])
 }
 
 model ShiftPayment {
