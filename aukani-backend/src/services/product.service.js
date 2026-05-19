@@ -102,9 +102,10 @@ export const productService = {
   },
 
   async update(id, data) {
+    const { stock, ...safeData } = data
     return prisma.product.update({
       where: { id },
-      data,
+      data: safeData,
       include: { category: { select: { id: true, name: true } } },
     })
   },

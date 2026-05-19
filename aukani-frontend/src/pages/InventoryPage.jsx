@@ -137,7 +137,7 @@ function ProductModal({ product, categories, onClose, onSave }) {
       ...form,
       price: Number(form.price),
       cost: form.cost ? Number(form.cost) : undefined,
-      stock: isService ? 0 : Number(form.stock),
+      ...(isNew && !isService ? { stock: Number(form.stock) } : {}),
       minStock: isService ? 0 : Number(form.minStock),
       barcode: isService ? undefined : (form.barcode || undefined),
       categoryId: form.categoryId ? Number(form.categoryId) : undefined,
@@ -214,7 +214,7 @@ function ProductModal({ product, categories, onClose, onSave }) {
           </div>
           {!isService && (
             <div className="grid grid-cols-2 gap-3">
-              {field("Stock inicial", "stock", "number", { min: 0 })}
+              {isNew && field("Stock inicial", "stock", "number", { min: 0 })}
               {field("Stock mínimo", "minStock", "number", { min: 0 })}
             </div>
           )}
