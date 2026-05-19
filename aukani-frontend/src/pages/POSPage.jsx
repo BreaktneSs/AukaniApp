@@ -1132,6 +1132,7 @@ export default function POSPage() {
     onSuccess: (data) => {
       sessionStorage.removeItem("aukani-open-shift")
       resetForNewShift(data.id)
+      qc.setQueryData(["shift-active"], { ...data, shiftPayments: [], expenses: [], _count: { orders: 0 } })
       qc.invalidateQueries({ queryKey: ["shift-active"] })
       toast.success("Turno abierto")
     },
