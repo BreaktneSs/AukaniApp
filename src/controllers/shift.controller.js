@@ -49,7 +49,7 @@ export const shiftController = {
   async getActive(req, reply) {
     const did = deviceId(req)
     if (!did) return reply.status(400).send({ error: "Dispositivo no identificado" })
-    const shift = await shiftService.getOpenByDevice(did)
+    const shift = await shiftService.getActiveForDevice(req.user.id, did)
     if (!shift) return reply.status(404).send({ error: "No hay turno abierto en este dispositivo" })
     return reply.send(shift)
   },
