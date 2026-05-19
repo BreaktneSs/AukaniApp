@@ -112,6 +112,24 @@ export const shiftService = {
     return enrichOpenShift(shift)
   },
 
+  async getActiveForDevice(userId, deviceId) {
+    let shift = await prisma.shift.findFirst({
+      where: { deviceId, status: "OPEN" },
+      include: SHIFT_INCLUDE,
+    })
+    if (!shift) {
+      const orphan = await prisma.shift.findFirst({
+        where: { userId, status: "OPEN", deviceId: null },
+        select: { id: true },
+      })
+      if (orphan) {
+        await prisma.shift.update({ where: { id: orphan.id }, data: { deviceId } })
+        shift = await prisma.shift.findFirst({ where: { id: orphan.id }, include: SHIFT_INCLUDE })
+      }
+    }
+    return enrichOpenShift(shift)
+  },
+
   async openShift(userId, openingCash, deviceId, deviceIp) {
     if (deviceId) {
       const existing = await this.getOpenByDevice(deviceId)
