@@ -18,7 +18,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && window.location.pathname !== "/login") {
       localStorage.removeItem("aukani_token")
       localStorage.removeItem("aukani_user")
       window.location.href = "/login"
