@@ -11,7 +11,7 @@ import {
   Plus, Minus, Loader2, Package, X, ChevronRight,
   TrendingUp, ShoppingCart, AlertTriangle, Search,
   Edit2, Trash2, Upload, Camera, SlidersHorizontal,
-  ChevronDown, ChevronUp, Wrench, RefreshCw
+  ChevronDown, ChevronUp, Wrench, RefreshCw, RotateCcw, EyeOff
 } from "lucide-react"
 import Checkbox from "@/components/ui/Checkbox"
 import toast from "react-hot-toast"
@@ -503,10 +503,12 @@ export default function InventoryPage() {
   const [modal, setModal] = useState(null)         // "ENTRY" | "EXIT" | "new" | product
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [prefilledId, setPrefilledId] = useState(null)
+  const [showInactive, setShowInactive] = useState(false)
   const { user } = useAuthStore()
   const qc = useQueryClient()
-  const canEntry = user?.role === "ADMIN"
-  const canExit  = user?.role === "ADMIN"
+  const isAdmin  = user?.role === "ADMIN"
+  const canEntry = isAdmin
+  const canExit  = isAdmin
   const canEdit  = ["ADMIN", "JEFE"].includes(user?.role)
 
   const setFilter = useCallback((key, val) => setFilters(f => ({ ...f, [key]: val })), [])
@@ -521,6 +523,13 @@ export default function InventoryPage() {
       maxPrice: filters.maxPrice || undefined,
       lowStock: filters.lowStock || undefined,
     }),
+    enabled: !showInactive,
+  })
+
+  const { data: inactiveData, isLoading: loadingInactive } = useQuery({
+    queryKey: ["products-inactive", search],
+    queryFn: () => productsService.getAll({ limit: 200, active: "false", search: search || undefined }),
+    enabled: showInactive && isAdmin,
   })
 
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoriesService.getAll })
@@ -557,6 +566,16 @@ export default function InventoryPage() {
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
 
+  const reactivateProduct = useMutation({
+    mutationFn: (id) => productsService.update(id, { active: true }),
+    onSuccess: () => {
+      toast.success("Producto reactivado")
+      invalidate()
+      qc.invalidateQueries({ queryKey: ["products-inactive"] })
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
   const entry = useMutation({
     mutationFn: inventoryService.entry,
     onSuccess: () => {
@@ -583,6 +602,8 @@ export default function InventoryPage() {
   const handleExit  = (id = null) => { setPrefilledId(id); setModal("EXIT");  setSelectedProduct(null) }
   const handleEdit  = (p) => { setSelectedProduct(null); setModal(p) }
 
+  const inactiveProducts = inactiveData?.products || []
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
@@ -590,21 +611,36 @@ export default function InventoryPage() {
         <div>
           <h1 className="font-display font-bold text-xl" style={{ color: "var(--text-primary)" }}>Inventario</h1>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {isLoading ? "Cargando..." : `${products.length} productos`}
+            {showInactive
+              ? (loadingInactive ? "Cargando..." : `${inactiveProducts.length} productos desactivados`)
+              : (isLoading ? "Cargando..." : `${products.length} productos`)}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {canEdit && (
+        <div className="flex gap-2 flex-wrap items-center">
+          {isAdmin && (
+            <button
+              onClick={() => { setShowInactive(v => !v); setSearch(""); setShowFilters(false) }}
+              className="btn-md flex items-center gap-1.5"
+              style={{
+                background: showInactive ? "var(--warning-light, #fff7ed)" : "var(--bg-secondary)",
+                color: showInactive ? "var(--warning, #b45309)" : "var(--text-secondary)",
+                border: `1px solid ${showInactive ? "var(--warning, #f59e0b)" : "var(--border)"}`,
+              }}>
+              <EyeOff size={14} />
+              {showInactive ? "Ver activos" : "Desactivados"}
+            </button>
+          )}
+          {!showInactive && canEdit && (
             <button onClick={() => setModal("new")} className="btn-primary btn-md">
               <Plus size={15} /> Nuevo producto
             </button>
           )}
-          {canEntry && (
+          {!showInactive && canEntry && (
             <button onClick={() => handleEntry()} className="btn-md" style={{ background: "var(--brand-light)", color: "var(--brand)", border: "1px solid var(--brand)" }}>
               <Plus size={15} /> Entrada
             </button>
           )}
-          {canExit && (
+          {!showInactive && canExit && (
             <button onClick={() => handleExit()} className="btn-md text-white" style={{ background: "var(--danger)" }}>
               <Minus size={15} /> Salida
             </button>
@@ -612,8 +648,87 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Búsqueda + Filtros */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Vista productos desactivados (solo ADMIN) ── */}
+      {showInactive && isAdmin && (
+        <>
+          {/* Barra de búsqueda */}
+          <div className="relative max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+            <input className="input pl-9 pr-8" placeholder="Buscar productos desactivados..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+            {search && <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 btn-ghost w-5 h-5 rounded flex items-center justify-center"><X size={12} /></button>}
+          </div>
+
+          {loadingInactive ? (
+            <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin" style={{ color: "var(--text-muted)" }} /></div>
+          ) : inactiveProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <EyeOff size={32} style={{ color: "var(--text-muted)" }} />
+              <p style={{ color: "var(--text-muted)" }}>{search ? "No hay resultados" : "No hay productos desactivados"}</p>
+            </div>
+          ) : (
+            <div className="card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-xs font-medium" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                      <th className="text-left px-4 py-3">Producto</th>
+                      <th className="text-left px-4 py-3">Tipo</th>
+                      <th className="text-left px-4 py-3">Categoría</th>
+                      <th className="text-right px-4 py-3">Precio</th>
+                      <th className="px-4 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inactiveProducts.map((p, i) => (
+                      <tr key={p.id} className="border-b"
+                        style={{ borderColor: "var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg-primary)", opacity: 0.75 }}>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 opacity-50">
+                              <ProductImg imageUrl={p.imageUrl} name={p.name} size="sm" />
+                            </div>
+                            <div>
+                              <p className="font-medium line-through" style={{ color: "var(--text-muted)" }}>{p.name}</p>
+                              {p.sku && <p className="text-xs" style={{ color: "var(--text-muted)" }}>{p.sku}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="badge text-xs flex items-center gap-1 w-fit"
+                            style={{ background: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                            {p.type === "SERVICE" ? <Wrench size={10} /> : <Package size={10} />}
+                            {p.type === "SERVICE" ? "Servicio" : "Físico"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs" style={{ color: "var(--text-muted)" }}>{p.category?.name || "—"}</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-xs" style={{ color: "var(--text-muted)" }}>{formatCOP(p.price)}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <button
+                            onClick={() => confirm({
+                              title: "¿Reactivar producto?",
+                              message: `"${p.name}" volverá a estar disponible en el sistema.`,
+                              confirmLabel: "Reactivar",
+                            }).then(ok => { if (ok) reactivateProduct.mutate(p.id) })}
+                            disabled={reactivateProduct.isPending}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ml-auto"
+                            style={{ background: "var(--brand-light)", color: "var(--brand)", border: "1px solid var(--brand)" }}>
+                            <RotateCcw size={12} />
+                            Reactivar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Búsqueda + Filtros (solo vista activos) */}
+      {!showInactive && <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
           <input className="input pl-9 pr-8" placeholder="Buscar por nombre, SKU o código de barras..."
@@ -629,10 +744,10 @@ export default function InventoryPage() {
           {activeFilterCount > 0 && <span className="w-4 h-4 rounded-full text-white flex items-center justify-center" style={{ background: "var(--brand)", fontSize: "10px" }}>{activeFilterCount}</span>}
           {showFilters ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
-      </div>
+      </div>}
 
       {/* Panel de filtros */}
-      {showFilters && (
+      {!showInactive && showFilters && (
         <div className="card p-4 grid grid-cols-2 md:grid-cols-4 gap-3 animate-slide-up">
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Categoría</label>
@@ -684,8 +799,8 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Tabla */}
-      {isLoading ? (
+      {/* Tabla activos */}
+      {!showInactive && (isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin" style={{ color: "var(--text-muted)" }} /></div>
       ) : products.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -749,7 +864,7 @@ export default function InventoryPage() {
             </table>
           </div>
         </div>
-      )}
+      ))}
 
       {/* Drawer de detalle */}
       {selectedProduct && (

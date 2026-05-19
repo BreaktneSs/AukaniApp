@@ -5,7 +5,11 @@
       "Bash(npx kill-port *)",
       "Bash(node_modules/.bin/prisma migrate *)",
       "Bash(npm install *)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(dotenv -e .env.dev -- npx prisma migrate deploy)",
+      "Bash(dotenv -e .env.dev -- npx prisma generate)",
+      "Bash(dotenv -e .env.dev -- npx prisma generate --no-engine)",
+      "Bash(node --input-type=module)"
     ]
   }
 }
