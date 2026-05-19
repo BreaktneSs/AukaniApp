@@ -579,7 +579,7 @@ function CloseAccountWarningModal({ account, onConfirm, onClose }) {
 // ── Pantalla apertura de turno ────────────────────────────
 // ── Contador de billetes y monedas ───────────────────────
 const BILLS = [100000, 50000, 20000, 10000, 5000, 2000]
-const COINS = [1000, 500, 400, 300, 200, 100]
+const COINS = [1000, 500, 200, 100]
 
 function BillCounter({ onChange, storageKey }) {
   const { touchMode } = useUiStore()
@@ -1453,12 +1453,12 @@ export default function POSPage() {
                       <button onClick={clearActive} className="text-xs btn-ghost px-2 py-0.5 rounded" style={{ color: "var(--danger)" }}>Limpiar</button>
                     </div>
                     {items.map(item => {
-                      const productStock = allProducts.find(p => p.id === item.id)?.stock
+                      const cartProduct = allProducts.find(p => p.id === item.id)
                       return (
                         <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem}
                           onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
                           onEditPrice={(it) => setPriceEdit(it)}
-                          maxQty={productStock}
+                          maxQty={cartProduct?.type !== "SERVICE" ? cartProduct?.stock : undefined}
                         />
                       )
                     })}
