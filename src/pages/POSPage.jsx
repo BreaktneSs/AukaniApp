@@ -579,7 +579,7 @@ function CloseAccountWarningModal({ account, onConfirm, onClose }) {
 // ── Pantalla apertura de turno ────────────────────────────
 // ── Contador de billetes y monedas ───────────────────────
 const BILLS = [100000, 50000, 20000, 10000, 5000, 2000]
-const COINS = [1000, 500, 200, 100]
+const COINS = [1000, 500, 200, 100, 50]
 
 function BillCounter({ onChange, storageKey }) {
   const { touchMode } = useUiStore()
