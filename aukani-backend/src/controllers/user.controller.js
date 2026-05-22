@@ -5,7 +5,8 @@ const ip = (req) => req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req
 
 export const userController = {
   async getAll(req, reply) {
-    return reply.send(await userService.getAll())
+    const includeInactive = req.query.includeInactive === "true"
+    return reply.send(await userService.getAll({ includeInactive }))
   },
 
   async getById(req, reply) {
@@ -51,13 +52,23 @@ export const userController = {
   },
 
   async deactivate(req, reply) {
+    if (Number(req.params.id) === req.user.id)
+      return reply.status(400).send({ error: "No puedes desactivar tu propia cuenta" })
     const result = await userService.deactivate(Number(req.params.id))
     auditService.log({
       userId: req.user.id, userName: req.user.name, userRole: req.user.role,
       action: "USER_DEACTIVATE", entity: "USER", entityId: result.id,
-      entityLabel: result.name,
-      newValues: { active: false },
-      ip: ip(req),
+      entityLabel: result.name, newValues: { active: false }, ip: ip(req),
+    })
+    return reply.send(result)
+  },
+
+  async reactivate(req, reply) {
+    const result = await userService.update(Number(req.params.id), { active: true })
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "USER_REACTIVATE", entity: "USER", entityId: result.id,
+      entityLabel: result.name, newValues: { active: true }, ip: ip(req),
     })
     return reply.send(result)
   },

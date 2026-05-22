@@ -18,4 +18,15 @@ export const authController = {
     const user = await authService.me(req.user.id)
     return reply.send(user)
   },
+
+  async changeOwnPassword(req, reply) {
+    const { currentPassword, newPassword } = req.body
+    await authService.changeOwnPassword(req.user.id, currentPassword, newPassword)
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "USER_PASSWORD_CHANGE", entity: "USER", entityId: req.user.id,
+      entityLabel: req.user.name, ip: ip(req),
+    })
+    return reply.send({ ok: true })
+  },
 }
