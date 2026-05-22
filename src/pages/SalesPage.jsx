@@ -4,7 +4,7 @@ import { ordersService } from "@/services/orders.service"
 import { paymentMethodsService } from "@/services/catalog.service"
 import { useUiStore } from "@/store/ui.store"
 import NumPad from "@/components/ui/NumPad"
-import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus, AlertTriangle } from "lucide-react"
+import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus, AlertTriangle, User } from "lucide-react"
 import { confirm } from "@/components/ui/ConfirmDialog"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
@@ -43,53 +43,82 @@ function OrderDetail({ order, onClose, onRefund }) {
           </div>
         </div>
 
-        {/* Items */}
-        <div className="space-y-1 mb-4">
-          {order.items?.map(item => {
-            const returned = item.refundedQty > 0
-            const fullyReturned = item.refundedQty >= item.quantity
-            const priceAltered = item.originalPrice != null && Number(item.originalPrice) !== Number(item.price)
-            return (
-              <div key={item.id} className="rounded-md px-2 py-1.5" style={{ background: returned ? "var(--warning-light)" : "transparent" }}>
-                <div className="flex justify-between text-sm">
-                  <span style={{
-                    color: fullyReturned ? "var(--text-muted)" : "var(--text-primary)",
-                    textDecoration: fullyReturned ? "line-through" : "none",
-                  }}>
-                    {item.product?.name} × {item.quantity}
-                  </span>
-                  <span className="font-mono" style={{ color: fullyReturned ? "var(--text-muted)" : "var(--text-secondary)" }}>
-                    {formatCOP(Number(item.price) * item.quantity)}
-                  </span>
+        {/* Items agrupados por quien los agregó */}
+        <div className="space-y-3 mb-4">
+          {(() => {
+            const items = order.items || []
+            const groups = []
+            const seen = new Map()
+            for (const item of items) {
+              const key = item.addedBy?.id ?? "__unknown__"
+              if (!seen.has(key)) {
+                seen.set(key, { label: item.addedBy?.name ?? null, items: [] })
+                groups.push(seen.get(key))
+              }
+              seen.get(key).items.push(item)
+            }
+            const multiGroup = groups.length > 1
+            return groups.map((group, gi) => (
+              <div key={gi}>
+                {multiGroup && (
+                  <div className="flex items-center gap-1 mb-1 px-1">
+                    <User size={11} style={{ color: "var(--brand)" }} />
+                    <p className="text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: "var(--brand)" }}>
+                      {group.label ?? "Sin asignar"}
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {group.items.map(item => {
+                    const returned = item.refundedQty > 0
+                    const fullyReturned = item.refundedQty >= item.quantity
+                    const priceAltered = item.originalPrice != null && Number(item.originalPrice) !== Number(item.price)
+                    return (
+                      <div key={item.id} className="rounded-md px-2 py-1.5" style={{ background: returned ? "var(--warning-light)" : "transparent" }}>
+                        <div className="flex justify-between text-sm">
+                          <span style={{
+                            color: fullyReturned ? "var(--text-muted)" : "var(--text-primary)",
+                            textDecoration: fullyReturned ? "line-through" : "none",
+                          }}>
+                            {item.product?.name} × {item.quantity}
+                          </span>
+                          <span className="font-mono" style={{ color: fullyReturned ? "var(--text-muted)" : "var(--text-secondary)" }}>
+                            {formatCOP(Number(item.price) * item.quantity)}
+                          </span>
+                        </div>
+                        {priceAltered && (
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-mono" style={{ color: "var(--text-muted)", textDecoration: "line-through" }}>
+                                {formatCOP(Number(item.originalPrice))} c/u cat.
+                              </span>
+                              <span className="text-xs font-semibold" style={{ color: "var(--brand)" }}>precio ajustado</span>
+                            </div>
+                            {item.priceNote && (
+                              <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
+                                "{item.priceNote}"
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {returned && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <RotateCcw size={10} style={{ color: "var(--warning)" }} />
+                            <span className="text-xs" style={{ color: "var(--warning)" }}>
+                              {item.refundedQty === item.quantity
+                                ? "Devuelto completo"
+                                : `${item.refundedQty} devuelto${item.refundedQty > 1 ? "s" : ""} · quedan ${item.quantity - item.refundedQty}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
-                {priceAltered && (
-                  <div className="flex flex-col gap-0.5 mt-0.5">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)", textDecoration: "line-through" }}>
-                        {formatCOP(Number(item.originalPrice))} c/u cat.
-                      </span>
-                      <span className="text-xs font-semibold" style={{ color: "var(--brand)" }}>precio ajustado</span>
-                    </div>
-                    {item.priceNote && (
-                      <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
-                        "{item.priceNote}"
-                      </span>
-                    )}
-                  </div>
-                )}
-                {returned && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <RotateCcw size={10} style={{ color: "var(--warning)" }} />
-                    <span className="text-xs" style={{ color: "var(--warning)" }}>
-                      {item.refundedQty === item.quantity
-                        ? "Devuelto completo"
-                        : `${item.refundedQty} devuelto${item.refundedQty > 1 ? "s" : ""} · quedan ${item.quantity - item.refundedQty}`}
-                    </span>
-                  </div>
-                )}
               </div>
-            )
-          })}
+            ))
+          })()}
         </div>
 
         {/* Refund subtotal */}

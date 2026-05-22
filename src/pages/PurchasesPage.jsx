@@ -167,6 +167,7 @@ function PurchaseModal({ open, onClose, allProducts, onSuccess }) {
   const updateCost = (id, cost) => setInvoiceItems(prev => prev.map(i => i.productId === id ? { ...i, unitCost: cost } : i))
   const removeItem = (id) => setInvoiceItems(prev => prev.filter(i => i.productId !== id))
   const grandTotal = invoiceItems.reduce((s, i) => s + i.quantity * Number(i.unitCost), 0)
+  const roundedTotal = Math.round(grandTotal / 50) * 50
 
   const handleNumPadConfirm = (val) => {
     if (!numPad) return
@@ -265,7 +266,7 @@ function PurchaseModal({ open, onClose, allProducts, onSuccess }) {
                 <tfoot>
                   <tr style={{ background: "var(--bg-tertiary)" }}>
                     <td colSpan={3} className="px-3 py-2.5 text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>Total compra</td>
-                    <td className="px-3 py-2.5 text-right font-mono font-bold text-base" style={{ color: "var(--brand)" }}>{formatCOP(grandTotal)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono font-bold text-base" style={{ color: "var(--brand)" }}>{formatCOP(roundedTotal)}</td>
                     <td />
                   </tr>
                 </tfoot>
@@ -288,7 +289,7 @@ function PurchaseModal({ open, onClose, allProducts, onSuccess }) {
             })
           }} disabled={saving || invoiceItems.length === 0} className="btn-primary btn-md flex-1">
             {saving ? <Loader2 size={15} className="animate-spin" /> : <ShoppingBag size={15} />}
-            {saving ? "Registrando..." : `Registrar · ${formatCOP(grandTotal)}`}
+            {saving ? "Registrando..." : `Registrar · ${formatCOP(roundedTotal)}`}
           </button>
         </div>
       </div>
