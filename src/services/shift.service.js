@@ -310,7 +310,7 @@ export const shiftService = {
         orders: {
           orderBy: { createdAt: "desc" },
           include: {
-            items: { include: { product: { select: { name: true } } } },
+            items: { include: { product: { select: { name: true } }, addedBy: { select: { id: true, name: true } } } },
             payments: { include: { paymentMethod: true } },
           },
         },

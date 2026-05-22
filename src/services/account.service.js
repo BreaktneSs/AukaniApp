@@ -12,7 +12,10 @@ export const accountService = {
       where: { shiftId, status: "OPEN" },
       include: {
         items: {
-          include: { product: { select: { id: true, name: true } } },
+          include: {
+            product: { select: { id: true, name: true } },
+            addedBy: { select: { id: true, name: true } },
+          },
           orderBy: { addedAt: "asc" },
         },
       },
@@ -25,7 +28,10 @@ export const accountService = {
       where: { id },
       include: {
         items: {
-          include: { product: { select: { id: true, name: true } } },
+          include: {
+            product: { select: { id: true, name: true } },
+            addedBy: { select: { id: true, name: true } },
+          },
           orderBy: { addedAt: "asc" },
         },
       },
@@ -78,7 +84,7 @@ export const accountService = {
         return tx.accountItem.update({ where: { id: existing.id }, data: { quantity: { increment: 1 } } })
       }
       return tx.accountItem.create({
-        data: { accountId, productId, quantity: 1, price: price ?? product.price },
+        data: { accountId, productId, quantity: 1, price: price ?? product.price, addedByUserId: userId },
       })
     })
   },

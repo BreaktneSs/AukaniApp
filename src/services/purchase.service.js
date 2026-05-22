@@ -14,7 +14,8 @@ const INCLUDE_PURCHASE = {
 
 export const purchaseService = {
   async create({ userId, items, notes }) {
-    const total = items.reduce((sum, i) => sum + Number(i.unitCost) * i.quantity, 0)
+    const rawTotal = items.reduce((sum, i) => sum + Number(i.unitCost) * i.quantity, 0)
+    const total = Math.round(rawTotal / 50) * 50
 
     return prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.create({

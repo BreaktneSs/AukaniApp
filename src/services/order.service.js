@@ -36,6 +36,7 @@ export const orderService = {
           price: effectivePrice,
           ...(originalPrice !== null && { originalPrice }),
           ...(originalPrice !== null && item.priceNote && { priceNote: item.priceNote }),
+          addedByUserId: item.addedByUserId ?? userId,
         })
 
         if (!isService && !item.alreadyDecremented) {
@@ -248,7 +249,7 @@ export const orderService = {
   async getById(id) {
     return prisma.order.findUnique({
       where: { id },
-      include: { user: { select: { id: true, name: true } }, items: { include: { product: { select: { id: true, name: true, barcode: true } } } }, payments: { include: { paymentMethod: true } } },
+      include: { user: { select: { id: true, name: true } }, items: { include: { product: { select: { id: true, name: true, barcode: true } }, addedBy: { select: { id: true, name: true } } } }, payments: { include: { paymentMethod: true } } },
     })
   },
 
