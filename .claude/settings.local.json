@@ -9,7 +9,13 @@
       "Bash(dotenv -e .env.dev -- npx prisma migrate deploy)",
       "Bash(dotenv -e .env.dev -- npx prisma generate)",
       "Bash(dotenv -e .env.dev -- npx prisma generate --no-engine)",
-      "Bash(node --input-type=module)"
+      "Bash(node --input-type=module)",
+      "Bash(dotenv -e .env.dev -- npx prisma migrate status)",
+      "Bash(dotenv -e .env.dev -- npx prisma migrate resolve --rolled-back \"20260522000000_added_by_user\")",
+      "Bash(dotenv -e .env.dev -- npx prisma migrate dev)",
+      "Bash(dotenv -e .env.dev -- node --input-type=module)",
+      "Bash(2>&1)",
+      "Bash(dotenv -e .env.dev -- npx prisma migrate resolve --applied \"20260522000000_added_by_user\")"
     ]
   }
 }

@@ -137,7 +137,6 @@ function ProductModal({ product, categories, onClose, onSave }) {
       ...form,
       price: Number(form.price),
       cost: form.cost ? Number(form.cost) : undefined,
-      ...(isNew && !isService ? { stock: Number(form.stock) } : {}),
       minStock: isService ? 0 : Number(form.minStock),
       barcode: isService ? undefined : (form.barcode || undefined),
       categoryId: form.categoryId ? Number(form.categoryId) : undefined,
@@ -213,8 +212,7 @@ function ProductModal({ product, categories, onClose, onSave }) {
             ))}
           </div>
           {!isService && (
-            <div className="grid grid-cols-2 gap-3">
-              {isNew && field("Stock inicial", "stock", "number", { min: 0 })}
+            <div>
               {field("Stock mínimo", "minStock", "number", { min: 0 })}
             </div>
           )}
@@ -369,7 +367,7 @@ function MovementModal({ type, products, prefilledId, onClose, onSave }) {
 }
 
 // ── Drawer detalle de producto ────────────────────────────
-function ProductDrawer({ product, onClose, canEntry, canExit, canEdit, onEntry, onExit, onEdit, onDelete }) {
+function ProductDrawer({ product, onClose, canEntry, canExit, canEdit, canDeactivate, onEntry, onExit, onEdit, onDelete }) {
   const { data, isLoading } = useQuery({
     queryKey: ["movements-product", product.id],
     queryFn: () => inventoryService.getMovements({ productId: product.id, limit: 50 }),
@@ -398,10 +396,10 @@ function ProductDrawer({ product, onClose, canEntry, canExit, canEdit, onEntry, 
           </div>
           <div className="flex items-center gap-1">
             {canEdit && (
-              <>
-                <button onClick={() => onEdit(product)} className="btn-ghost w-7 h-7 rounded flex items-center justify-center"><Edit2 size={13} /></button>
-                <button onClick={() => { confirm({ title: `¿Desactivar producto?`, message: `"${product.name}" quedará inactivo.`, confirmLabel: "Desactivar" }).then(ok => { if (ok) onDelete(product.id) }) }} className="btn-ghost w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--danger)" }}><Trash2 size={13} /></button>
-              </>
+              <button onClick={() => onEdit(product)} className="btn-ghost w-7 h-7 rounded flex items-center justify-center"><Edit2 size={13} /></button>
+            )}
+            {canDeactivate && (
+              <button onClick={() => { confirm({ title: `¿Desactivar producto?`, message: `"${product.name}" quedará inactivo.`, confirmLabel: "Desactivar" }).then(ok => { if (ok) onDelete(product.id) }) }} className="btn-ghost w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--danger)" }}><Trash2 size={13} /></button>
             )}
             <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center ml-1"><X size={15} /></button>
           </div>
@@ -869,7 +867,7 @@ export default function InventoryPage() {
       {/* Drawer de detalle */}
       {selectedProduct && (
         <ProductDrawer
-          product={selectedProduct} canEntry={canEntry} canExit={canExit} canEdit={canEdit}
+          product={selectedProduct} canEntry={canEntry} canExit={canExit} canEdit={canEdit} canDeactivate={isAdmin}
           onClose={() => setSelectedProduct(null)}
           onEntry={handleEntry} onExit={handleExit}
           onEdit={handleEdit}

@@ -1055,6 +1055,8 @@ export default function POSPage() {
         price: i.price,
         quantity: i.quantity,
         fromAccount: true,
+        addedByUserId: i.addedBy?.id ?? null,
+        addedByName: i.addedBy?.name ?? null,
       }))
       const { sales } = useCartStore.getState()
       const exists = sales.some(s => s.type === "account" && s.backendId === ba.id)
@@ -1280,7 +1282,7 @@ export default function POSPage() {
         ...(i.originalPrice != null && { customPrice: i.price }),
         ...(i.priceNote && { priceNote: i.priceNote }),
       })),
-      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity, alreadyDecremented: true, customPrice: i.price })),
+      ...payingRemoteItems.map(i => ({ productId: i.id, quantity: i.quantity, alreadyDecremented: true, customPrice: i.price, addedByUserId: i.addedByUserId ?? null })),
     ]
     const accountItemUpdates = payingRemoteItems
       .filter(i => i.accountItemId)

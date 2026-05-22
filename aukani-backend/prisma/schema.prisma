@@ -62,6 +62,8 @@ model User {
   createdReservations   Reservation[] @relation("ReservationCreatedBy")
   completedReservations Reservation[] @relation("ReservationCompletedBy")
   cancelledReservations Reservation[] @relation("ReservationCancelledBy")
+  addedOrderItems       OrderItem[]   @relation("OrderItemAddedBy")
+  addedAccountItems     AccountItem[] @relation("AccountItemAddedBy")
 
   @@index([email])
   @@index([role])
@@ -218,9 +220,11 @@ model OrderItem {
   originalPrice Decimal? @db.Decimal(10, 2)
   priceNote     String?
   refundedQty   Int      @default(0)
+  addedByUserId Int?
 
   order   Order   @relation(fields: [orderId], references: [id])
   product Product @relation(fields: [productId], references: [id])
+  addedBy User?   @relation("OrderItemAddedBy", fields: [addedByUserId], references: [id])
 
   @@index([orderId])
   @@index([productId])
@@ -421,15 +425,17 @@ model Account {
 }
 
 model AccountItem {
-  id        Int      @id @default(autoincrement())
-  accountId Int
-  productId Int
-  quantity  Int
-  price     Decimal  @db.Decimal(10, 2)
-  addedAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  accountId     Int
+  productId     Int
+  quantity      Int
+  price         Decimal  @db.Decimal(10, 2)
+  addedAt       DateTime @default(now())
+  addedByUserId Int?
 
   account Account @relation(fields: [accountId], references: [id])
   product Product @relation(fields: [productId], references: [id])
+  addedBy User?   @relation("AccountItemAddedBy", fields: [addedByUserId], references: [id])
 
   @@index([accountId])
 }
