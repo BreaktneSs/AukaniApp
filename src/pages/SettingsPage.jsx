@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { usersService } from "@/services/users.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
-import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad } from "lucide-react"
+import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad, Edit2, Key, UserX, UserCheck, ChevronUp, ChevronDown, Eye, EyeOff } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 import { agentService } from "@/services/agent.service"
@@ -13,6 +13,7 @@ import { useThemeStore } from "@/store/theme.store"
 import { useUiStore } from "@/store/ui.store"
 
 const ALL_TABS = [
+  { name: "Mi cuenta",       roles: ["ADMIN", "JEFE", "VENDEDOR"] },
   { name: "General",         roles: ["ADMIN", "JEFE", "VENDEDOR"] },
   { name: "Negocio",         roles: ["ADMIN", "JEFE"] },
   { name: "Impresora",       roles: ["ADMIN", "JEFE", "VENDEDOR"] },
@@ -20,6 +21,97 @@ const ALL_TABS = [
   { name: "Categorías",      roles: ["ADMIN", "JEFE"] },
   { name: "Métodos de pago", roles: ["ADMIN", "JEFE"] },
 ]
+
+// ── Mi cuenta ────────────────────────────────────────────
+const DOMAIN_LABEL = "@aukani.com"
+
+function MyAccountTab() {
+  const { user } = useAuthStore()
+  const [current, setCurrent]   = useState("")
+  const [next, setNext]         = useState("")
+  const [confirm_, setConfirm]  = useState("")
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNext, setShowNext]       = useState(false)
+
+  const change = useMutation({
+    mutationFn: () => usersService.changeOwnPassword(current, next),
+    onSuccess: () => {
+      toast.success("Contraseña actualizada")
+      setCurrent(""); setNext(""); setConfirm("")
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (next !== confirm_) { toast.error("Las contraseñas no coinciden"); return }
+    if (next.length < 6)   { toast.error("Mínimo 6 caracteres"); return }
+    change.mutate()
+  }
+
+  const roleInfo = { ADMIN: "Administrador", JEFE: "Jefe", VENDEDOR: "Vendedor" }
+
+  return (
+    <div className="max-w-sm space-y-5">
+      {/* Info del usuario */}
+      <div className="card p-4 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-xl shrink-0"
+          style={{ background: "var(--brand)" }}>
+          {user?.name?.[0]?.toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{user?.name}</p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {user?.email?.replace(DOMAIN_LABEL, "")}
+            <span style={{ color: "var(--border)" }}>{DOMAIN_LABEL}</span>
+          </p>
+          <p className="text-xs mt-0.5 font-medium" style={{ color: "var(--brand)" }}>
+            {roleInfo[user?.role]}
+          </p>
+        </div>
+      </div>
+
+      {/* Cambiar contraseña */}
+      <div className="card p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+          Cambiar contraseña
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {[
+            { label: "Contraseña actual", value: current, set: setCurrent, show: showCurrent, toggle: () => setShowCurrent(v => !v) },
+            { label: "Nueva contraseña",  value: next,    set: setNext,    show: showNext,    toggle: () => setShowNext(v => !v) },
+            { label: "Confirmar nueva",   value: confirm_, set: setConfirm, show: showNext,   toggle: null },
+          ].map(({ label, value, set, show, toggle }) => (
+            <div key={label}>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{label}</label>
+              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <input
+                  type={show ? "text" : "password"} required
+                  className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                  style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  value={value} onChange={e => set(e.target.value)}
+                  placeholder="••••••••"
+                />
+                {toggle && (
+                  <button type="button" onClick={toggle}
+                    className="px-3 flex items-center"
+                    style={{ background: "var(--bg-secondary)", borderLeft: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                    {show ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button type="submit" disabled={change.isPending}
+            className="btn-primary btn-md w-full flex items-center justify-center gap-2">
+            {change.isPending ? <Loader2 size={14} className="animate-spin" /> : <Key size={14} />}
+            Actualizar contraseña
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 // ── General ───────────────────────────────────────────────
 function GeneralTab() {
@@ -93,74 +185,378 @@ function GeneralTab() {
 }
 
 // ── Usuarios ─────────────────────────────────────────────
-function UsersTab() {
-  const [modal, setModal] = useState(false)
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "VENDEDOR" })
-  const qc = useQueryClient()
 
-  const { data: users = [], isLoading } = useQuery({ queryKey: ["users"], queryFn: usersService.getAll })
+const ROLES = {
+  ADMIN:    { label: "Admin",    color: "var(--danger)",  bg: "var(--danger-light)",  order: 0 },
+  JEFE:     { label: "Jefe",     color: "var(--warning)", bg: "var(--warning-light)", order: 1 },
+  VENDEDOR: { label: "Vendedor", color: "var(--brand)",   bg: "var(--brand-light)",   order: 2 },
+}
+const ROLE_ORDER = ["ADMIN", "JEFE", "VENDEDOR"]
+
+const DOMAIN = "@aukani.com"
+const username = (email) => email?.replace(DOMAIN, "") ?? email
+
+function RoleBadge({ role }) {
+  const r = ROLES[role]
+  return (
+    <span className="badge text-xs font-semibold px-2 py-0.5"
+      style={{ color: r?.color, background: r?.bg }}>
+      {r?.label}
+    </span>
+  )
+}
+
+function Avatar({ name, active }) {
+  return (
+    <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
+      style={{ background: active ? "var(--brand)" : "var(--text-muted)", opacity: active ? 1 : 0.6 }}>
+      {name?.[0]?.toUpperCase()}
+    </div>
+  )
+}
+
+// Modal crear / editar usuario
+function UserModal({ user, onClose, onSave, loading }) {
+  const isNew = !user
+  const [username_, setUsername] = useState(isNew ? "" : username(user.email))
+  const [name, setName]         = useState(user?.name ?? "")
+  const [role, setRole]         = useState(user?.role ?? "VENDEDOR")
+  const [password, setPassword] = useState("")
+  const [showPass, setShowPass] = useState(false)
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const email = `${username_.trim()}${DOMAIN}`
+    if (isNew) onSave({ name: name.trim(), email, password, role })
+    else        onSave({ name: name.trim(), email, role })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-sm animate-slide-up space-y-4" onClick={e => e.stopPropagation()}>
+        <h2 className="font-display font-bold text-lg" style={{ color: "var(--text-primary)" }}>
+          {isNew ? "Nuevo usuario" : `Editar — ${user.name}`}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Nombre */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nombre completo</label>
+            <input className="input" required value={name} onChange={e => setName(e.target.value)} placeholder="Juan Pérez" />
+          </div>
+
+          {/* Usuario (email prefix) */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Usuario</label>
+            <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+              <input
+                className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                required value={username_}
+                onChange={e => setUsername(e.target.value.replace(/[\s@]/g, ""))}
+                placeholder="juan.perez"
+              />
+              <span className="px-3 flex items-center text-sm select-none shrink-0"
+                style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", borderLeft: "1px solid var(--border)" }}>
+                {DOMAIN}
+              </span>
+            </div>
+          </div>
+
+          {/* Contraseña — solo al crear */}
+          {isNew && (
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Contraseña</label>
+              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <input
+                  className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                  style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  type={showPass ? "text" : "password"} required minLength={6}
+                  value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <button type="button" onClick={() => setShowPass(v => !v)}
+                  className="px-3 flex items-center" style={{ background: "var(--bg-secondary)", borderLeft: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Rol */}
+          <div>
+            <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Rol</label>
+            <div className="grid grid-cols-3 gap-2">
+              {ROLE_ORDER.map(r => {
+                const active = role === r
+                return (
+                  <button key={r} type="button" onClick={() => setRole(r)}
+                    className="py-2 rounded-lg text-xs font-semibold border transition-all"
+                    style={{
+                      background: active ? ROLES[r].bg : "var(--bg-primary)",
+                      color: active ? ROLES[r].color : "var(--text-muted)",
+                      borderColor: active ? ROLES[r].color : "var(--border)",
+                    }}>
+                    {ROLES[r].label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
+              {role === "ADMIN" && "Acceso total al sistema"}
+              {role === "JEFE" && "Gestión de inventario, reportes y turnos"}
+              {role === "VENDEDOR" && "Solo puede vender y ver su turno"}
+            </p>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button type="submit" disabled={loading} className="btn-primary btn-md flex-1">
+              {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+              {isNew ? "Crear" : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Modal cambiar contraseña
+function PasswordModal({ user, onClose, onSave, loading }) {
+  const [password, setPassword] = useState("")
+  const [showPass, setShowPass] = useState(false)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-xs animate-slide-up space-y-4" onClick={e => e.stopPropagation()}>
+        <h2 className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+          Cambiar contraseña — {user.name}
+        </h2>
+        <form onSubmit={e => { e.preventDefault(); onSave(password) }} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nueva contraseña</label>
+            <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+              <input
+                className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                type={showPass ? "text" : "password"} required minLength={6} autoFocus
+                value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+              />
+              <button type="button" onClick={() => setShowPass(v => !v)}
+                className="px-3 flex items-center" style={{ background: "var(--bg-secondary)", borderLeft: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button type="submit" disabled={loading} className="btn-md flex-1 text-white"
+              style={{ background: "var(--warning)" }}>
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Key size={14} />}
+              Cambiar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function UsersTab() {
+  const { user: me } = useAuthStore()
+  const qc = useQueryClient()
+  const [showInactive, setShowInactive] = useState(false)
+  const [editModal, setEditModal]   = useState(null) // null | "new" | user object
+  const [passModal, setPassModal]   = useState(null) // null | user object
+
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["users", showInactive],
+    queryFn: () => usersService.getAll({ includeInactive: showInactive }),
+  })
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["users"] })
+
   const create = useMutation({
     mutationFn: usersService.create,
-    onSuccess: () => { toast.success("Usuario creado"); qc.invalidateQueries({ queryKey: ["users"] }); setModal(false); setForm({ name: "", email: "", password: "", role: "VENDEDOR" }) },
+    onSuccess: () => { toast.success("Usuario creado"); invalidate(); setEditModal(null) },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+  const update = useMutation({
+    mutationFn: ({ id, data }) => usersService.update(id, data),
+    onSuccess: () => { toast.success("Usuario actualizado"); invalidate(); setEditModal(null) },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+  const changePassword = useMutation({
+    mutationFn: ({ id, password }) => usersService.changePassword(id, password),
+    onSuccess: () => { toast.success("Contraseña actualizada"); setPassModal(null) },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
   const deactivate = useMutation({
     mutationFn: usersService.deactivate,
-    onSuccess: () => { toast.success("Usuario desactivado"); qc.invalidateQueries({ queryKey: ["users"] }) },
+    onSuccess: () => { toast.success("Usuario desactivado"); invalidate() },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+  const reactivate = useMutation({
+    mutationFn: usersService.reactivate,
+    onSuccess: () => { toast.success("Usuario reactivado"); invalidate() },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
 
-  const ROLES = { ADMIN: { label: "Admin", color: "var(--danger)" }, JEFE: { label: "Jefe", color: "var(--warning)" }, VENDEDOR: { label: "Vendedor", color: "var(--brand)" } }
+  const handleRoleShift = (u, direction) => {
+    const idx = ROLE_ORDER.indexOf(u.role)
+    const next = ROLE_ORDER[idx + direction]
+    if (!next) return
+    confirm({
+      title: `¿Cambiar rol de ${u.name}?`,
+      message: `${ROLES[u.role].label} → ${ROLES[next].label}`,
+      confirmLabel: "Confirmar",
+    }).then(ok => { if (ok) update.mutate({ id: u.id, data: { role: next } }) })
+  }
 
   return (
-    <div className="space-y-4">
-      <button onClick={() => setModal(true)} className="btn-primary btn-md"><Plus size={15} /> Nuevo usuario</button>
-      {isLoading ? <Loader2 className="animate-spin" style={{ color: "var(--text-muted)" }} /> : (
+    <div className="space-y-4 max-w-2xl">
+      {/* Barra superior */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setEditModal("new")} className="btn-primary btn-md">
+            <Plus size={15} /> Nuevo usuario
+          </button>
+          <button
+            onClick={() => setShowInactive(v => !v)}
+            className="btn-md flex items-center gap-1.5"
+            style={{
+              background: showInactive ? "var(--warning-light)" : "var(--bg-secondary)",
+              color: showInactive ? "var(--warning)" : "var(--text-secondary)",
+              border: `1px solid ${showInactive ? "var(--warning)" : "var(--border)"}`,
+            }}>
+            {showInactive ? <Eye size={14} /> : <EyeOff size={14} />}
+            {showInactive ? "Ver activos" : "Ver inactivos"}
+          </button>
+        </div>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {users.length} usuario{users.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      {/* Lista */}
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 size={22} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+        </div>
+      ) : (
         <div className="space-y-2">
-          {users.map(u => (
-            <div key={u.id} className="card p-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
-                style={{ background: "var(--brand)" }}>{u.name[0].toUpperCase()}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{u.name}</p>
-                <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{u.email}</p>
+          {users.map(u => {
+            const isMe = u.id === me?.id
+            const roleIdx = ROLE_ORDER.indexOf(u.role)
+            return (
+              <div key={u.id} className="card px-4 py-3 flex items-center gap-3"
+                style={{ opacity: u.active ? 1 : 0.55 }}>
+
+                <Avatar name={u.name} active={u.active} />
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {u.name}
+                      {isMe && <span className="ml-1.5 text-xs font-normal" style={{ color: "var(--brand)" }}>(tú)</span>}
+                    </p>
+                    <RoleBadge role={u.role} />
+                    {!u.active && (
+                      <span className="badge text-xs" style={{ color: "var(--text-muted)", background: "var(--bg-secondary)" }}>
+                        Inactivo
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    {username(u.email)}<span style={{ color: "var(--border)" }}>{DOMAIN}</span>
+                  </p>
+                </div>
+
+                {/* Controles de rol */}
+                {u.active && !isMe && (
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      disabled={roleIdx === 0}
+                      onClick={() => handleRoleShift(u, -1)}
+                      title="Subir rol"
+                      className="w-6 h-5 rounded flex items-center justify-center transition-opacity"
+                      style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", opacity: roleIdx === 0 ? 0.2 : 1 }}>
+                      <ChevronUp size={12} />
+                    </button>
+                    <button
+                      disabled={roleIdx === ROLE_ORDER.length - 1}
+                      onClick={() => handleRoleShift(u, 1)}
+                      title="Bajar rol"
+                      className="w-6 h-5 rounded flex items-center justify-center transition-opacity"
+                      style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", opacity: roleIdx === ROLE_ORDER.length - 1 ? 0.2 : 1 }}>
+                      <ChevronDown size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Acciones */}
+                <div className="flex items-center gap-1">
+                  {u.active && (
+                    <>
+                      <button onClick={() => setEditModal(u)} title="Editar"
+                        className="btn-ghost w-8 h-8 rounded flex items-center justify-center"
+                        style={{ color: "var(--text-secondary)" }}>
+                        <Edit2 size={13} />
+                      </button>
+                      <button onClick={() => setPassModal(u)} title="Cambiar contraseña"
+                        className="btn-ghost w-8 h-8 rounded flex items-center justify-center"
+                        style={{ color: "var(--warning)" }}>
+                        <Key size={13} />
+                      </button>
+                    </>
+                  )}
+                  {!isMe && (
+                    u.active ? (
+                      <button
+                        onClick={() => confirm({ title: `¿Desactivar a ${u.name}?`, message: "No podrá iniciar sesión.", confirmLabel: "Desactivar", variant: "warning" }).then(ok => { if (ok) deactivate.mutate(u.id) })}
+                        title="Desactivar" className="btn-ghost w-8 h-8 rounded flex items-center justify-center"
+                        style={{ color: "var(--danger)" }}>
+                        <UserX size={13} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => confirm({ title: `¿Reactivar a ${u.name}?`, confirmLabel: "Reactivar" }).then(ok => { if (ok) reactivate.mutate(u.id) })}
+                        title="Reactivar" className="btn-ghost w-8 h-8 rounded flex items-center justify-center"
+                        style={{ color: "var(--brand)" }}>
+                        <UserCheck size={13} />
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
-              <span className="badge text-xs" style={{ color: ROLES[u.role]?.color, background: `${ROLES[u.role]?.color}22` }}>{ROLES[u.role]?.label}</span>
-              {u.active && (
-                <button onClick={() => { confirm({ title: `¿Desactivar a ${u.name}?`, message: "El usuario no podrá iniciar sesión.", confirmLabel: "Desactivar" }).then(ok => { if (ok) deactivate.mutate(u.id) }) }}
-                  className="btn-ghost w-7 h-7 rounded flex items-center justify-center text-xs"
-                  style={{ color: "var(--danger)" }}>✕</button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setModal(false)}>
-          <div className="card p-6 w-full max-w-sm animate-slide-up" onClick={e => e.stopPropagation()}>
-            <h2 className="font-display font-bold text-lg mb-4" style={{ color: "var(--text-primary)" }}>Nuevo usuario</h2>
-            <form onSubmit={e => { e.preventDefault(); create.mutate(form) }} className="space-y-3">
-              {[["Nombre", "name", "text"], ["Email", "email", "email"], ["Contraseña", "password", "password"]].map(([label, key, type]) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{label}</label>
-                  <input type={type} required className="input" value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
-                </div>
-              ))}
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Rol</label>
-                <select className="input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-                  <option value="VENDEDOR">Vendedor</option>
-                  <option value="JEFE">Jefe</option>
-                  <option value="ADMIN">Administrador</option>
-                </select>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={() => setModal(false)} className="btn-outline btn-md flex-1">Cancelar</button>
-                <button type="submit" className="btn-primary btn-md flex-1" disabled={create.isPending}>Crear</button>
-              </div>
-            </form>
-          </div>
-        </div>
+
+      {/* Modales */}
+      {editModal && (
+        <UserModal
+          user={editModal === "new" ? null : editModal}
+          onClose={() => setEditModal(null)}
+          loading={create.isPending || update.isPending}
+          onSave={(data) => editModal === "new"
+            ? create.mutate(data)
+            : update.mutate({ id: editModal.id, data })
+          }
+        />
+      )}
+      {passModal && (
+        <PasswordModal
+          user={passModal}
+          onClose={() => setPassModal(null)}
+          loading={changePassword.isPending}
+          onSave={(password) => changePassword.mutate({ id: passModal.id, password })}
+        />
       )}
     </div>
   )
@@ -480,7 +876,7 @@ export default function SettingsPage() {
     <div className="p-4 md:p-6 space-y-4">
       <h1 className="font-display font-bold text-xl" style={{ color: "var(--text-primary)" }}>Configuración</h1>
 
-      <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+      <div className="flex gap-1 border-b flex-wrap" style={{ borderColor: "var(--border)" }}>
         {visibleTabs.map((t, i) => (
           <button key={t.name} onClick={() => setTab(i)}
             className="px-4 py-2 text-sm transition-colors border-b-2 -mb-px shrink-0"
@@ -491,6 +887,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="animate-fade-in">
+        {activeTab === "Mi cuenta"        && <MyAccountTab />}
         {activeTab === "General"         && <GeneralTab />}
         {activeTab === "Negocio"         && <BusinessTab />}
         {activeTab === "Impresora"       && <PrinterTab />}

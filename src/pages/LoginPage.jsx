@@ -7,7 +7,7 @@ import { Sun, Moon, Loader2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const { login } = useAuthStore()
@@ -16,9 +16,10 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!email || !password) return
+    if (!username || !password) return
     setLoading(true)
     try {
+      const email = `${username.trim()}@aukani.com`
       const { user, token } = await authService.login({ email, password })
       login(user, token)
       navigate("/pos")
@@ -58,17 +59,25 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-                Correo electrónico
+                Usuario
               </label>
-              <input
-                type="email"
-                className="input"
-                placeholder="admin@aukani.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                autoFocus
-                disabled={loading}
-              />
+              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <input
+                  type="text"
+                  className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                  style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  placeholder="nombre"
+                  value={username}
+                  onChange={e => setUsername(e.target.value.replace(/\s/g, ""))}
+                  autoFocus
+                  autoComplete="username"
+                  disabled={loading}
+                />
+                <span className="px-3 flex items-center text-sm select-none shrink-0"
+                  style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", borderLeft: "1px solid var(--border)" }}>
+                  @aukani.com
+                </span>
+              </div>
             </div>
 
             <div>
