@@ -8,5 +8,6 @@ export async function userRoutes(fastify) {
   fastify.post("/users",             { preHandler: onlyAdmin }, userController.create)
   fastify.put("/users/:id",          { preHandler: onlyAdmin }, userController.update)
   fastify.patch("/users/:id/password", { preHandler: onlyAdmin }, userController.changePassword)
-  fastify.delete("/users/:id",       { preHandler: onlyAdmin }, userController.deactivate)
+  fastify.delete("/users/:id",          { preHandler: onlyAdmin }, userController.deactivate)
+  fastify.patch("/users/:id/reactivate",{ preHandler: onlyAdmin }, userController.reactivate)
 }

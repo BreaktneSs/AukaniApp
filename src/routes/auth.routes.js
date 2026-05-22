@@ -14,5 +14,6 @@ export async function authRoutes(fastify) {
       },
     },
   }, authController.login)
-  fastify.get("/auth/me", { preHandler: [authenticate] }, authController.me)
+  fastify.get("/auth/me",              { preHandler: [authenticate] }, authController.me)
+  fastify.patch("/profile/password",   { preHandler: [authenticate] }, authController.changeOwnPassword)
 }
