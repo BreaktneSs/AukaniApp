@@ -36,4 +36,12 @@ export const inventoryController = {
   async getLowStock(req, reply) {
     return reply.send(await inventoryService.getLowStockProducts())
   },
+
+  async getSnapshot(req, reply) {
+    const { date } = req.query
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return reply.status(400).send({ error: "Parámetro 'date' requerido en formato YYYY-MM-DD" })
+    }
+    return reply.send(await inventoryService.getSnapshot(date))
+  },
 }
