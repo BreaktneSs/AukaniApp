@@ -102,8 +102,14 @@ export const accountService = {
           if (delta > 0) {
             if (product.stock < delta) throw { statusCode: 409, message: "Stock insuficiente" }
             await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: delta } } })
+            await tx.inventoryMovement.create({
+              data: { productId: item.productId, userId, type: "EXIT", quantity: delta, reason: `Ajuste cuenta #${accountId}` },
+            })
           } else {
             await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: -delta } } })
+            await tx.inventoryMovement.create({
+              data: { productId: item.productId, userId, type: "ENTRY", quantity: -delta, reason: `Ajuste cuenta #${accountId}` },
+            })
           }
         }
         if (quantity <= 0) return tx.accountItem.delete({ where: { id: itemId } })
@@ -117,23 +123,26 @@ export const accountService = {
     })
   },
 
-  async removeItem(accountId, itemId) {
+  async removeItem(accountId, itemId, userId) {
     const item = await prisma.accountItem.findUnique({ where: { id: itemId } })
     if (!item || item.accountId !== accountId) throw { statusCode: 404, message: "Item no encontrado en la cuenta" }
 
-    // Restaurar stock para productos físicos
     const product = await prisma.product.findUnique({ where: { id: item.productId } })
     if (product && product.type !== "SERVICE") {
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
-      })
+      await prisma.$transaction([
+        prisma.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } }),
+        prisma.inventoryMovement.create({
+          data: { productId: item.productId, userId, type: "ENTRY", quantity: item.quantity, reason: `Quitado de cuenta #${accountId}` },
+        }),
+        prisma.accountItem.delete({ where: { id: item.id } }),
+      ])
+      return item
     }
 
     return prisma.accountItem.delete({ where: { id: item.id } })
   },
 
-  async close(id) {
+  async close(id, userId) {
     return prisma.$transaction(async (tx) => {
       const account = await tx.account.findUnique({
         where: { id },
@@ -143,12 +152,11 @@ export const accountService = {
       })
       if (!account) throw { statusCode: 404, message: "Cuenta no encontrada" }
 
-      // Restaurar stock de productos físicos que quedaron en la cuenta
       for (const item of account.items) {
         if (item.product?.type !== "SERVICE") {
-          await tx.product.update({
-            where: { id: item.productId },
-            data:  { stock: { increment: item.quantity } },
+          await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } })
+          await tx.inventoryMovement.create({
+            data: { productId: item.productId, userId, type: "ENTRY", quantity: item.quantity, reason: `Cierre cuenta "${account.name}"` },
           })
         }
       }

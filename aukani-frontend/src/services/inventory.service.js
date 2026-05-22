@@ -4,4 +4,5 @@ export const inventoryService = {
   exit: (data) => api.post("/inventory/exit", data).then(r => r.data),
   getMovements: (params) => api.get("/inventory/movements", { params }).then(r => r.data),
   getLowStock: () => api.get("/inventory/low-stock").then(r => r.data),
+  getSnapshot: (date) => api.get("/inventory/snapshot", { params: { date } }).then(r => r.data),
 }

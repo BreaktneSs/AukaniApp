@@ -44,7 +44,7 @@ export const accountController = {
   async removeItem(req, reply) {
     const accountId = Number(req.params.id)
     const itemId    = Number(req.params.itemId)
-    const item = await accountService.removeItem(accountId, itemId)
+    const item = await accountService.removeItem(accountId, itemId, req.user.id)
     await auditService.log({
       userId: req.user.id, userName: req.user.name, userRole: req.user.role,
       action: "ACCOUNT_ITEM_REMOVE", entity: "ACCOUNT",
@@ -56,7 +56,7 @@ export const accountController = {
   },
 
   async close(req, reply) {
-    const account = await accountService.close(Number(req.params.id))
+    const account = await accountService.close(Number(req.params.id), req.user.id)
     await auditService.log({
       userId: req.user.id, userName: req.user.name, userRole: req.user.role,
       action: "ACCOUNT_CLOSE", entity: "ACCOUNT",

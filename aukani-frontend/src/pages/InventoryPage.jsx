@@ -1,4 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
+import * as XLSX from "xlsx"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { inventoryService } from "@/services/inventory.service"
 import { productsService } from "@/services/products.service"
@@ -11,7 +14,7 @@ import {
   Plus, Minus, Loader2, Package, X, ChevronRight,
   TrendingUp, ShoppingCart, AlertTriangle, Search,
   Edit2, Trash2, Upload, Camera, SlidersHorizontal,
-  ChevronDown, ChevronUp, Wrench, RefreshCw, RotateCcw, EyeOff
+  ChevronDown, ChevronUp, Wrench, RefreshCw, RotateCcw, EyeOff, CalendarSearch
 } from "lucide-react"
 import Checkbox from "@/components/ui/Checkbox"
 import toast from "react-hot-toast"
@@ -502,6 +505,7 @@ export default function InventoryPage() {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [prefilledId, setPrefilledId] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
+  const [showSnapshot, setShowSnapshot] = useState(false)
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const isAdmin  = user?.role === "ADMIN"
@@ -615,6 +619,15 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          {isAdmin && (
+            <button
+              onClick={() => setShowSnapshot(true)}
+              className="btn-md flex items-center gap-1.5"
+              style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
+              <CalendarSearch size={14} />
+              Corte
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => { setShowInactive(v => !v); setSearch(""); setShowFilters(false) }}
@@ -893,6 +906,166 @@ export default function InventoryPage() {
           onSave={d => modal === "ENTRY" ? entry.mutate(d) : exit.mutate(d)}
         />
       )}
+      {showSnapshot && <SnapshotModal onClose={() => setShowSnapshot(false)} />}
+    </div>
+  )
+}
+
+function SnapshotModal({ onClose }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [date, setDate] = useState(today)
+  const [submitted, setSubmitted] = useState(null)
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["inventory-snapshot", submitted],
+    queryFn: () => inventoryService.getSnapshot(submitted),
+    enabled: !!submitted,
+    staleTime: 0,
+  })
+
+  const total = data?.reduce((s, p) => s + p.stockAtCutoff, 0) ?? 0
+  const totalValor = data?.reduce((s, p) => s + p.stockAtCutoff * p.costAtCutoff, 0) ?? 0
+
+  const exportExcel = () => {
+    const rows = data.map(p => ({
+      Producto: p.name,
+      Categoría: p.category ?? "",
+      SKU: p.sku ?? "",
+      [`Stock al ${submitted}`]: p.stockAtCutoff,
+      [`Costo al ${submitted}`]: p.costAtCutoff,
+      [`Valor al ${submitted}`]: p.stockAtCutoff * p.costAtCutoff,
+      "Stock actual": p.stockNow,
+      "Costo actual": p.costNow,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Corte")
+    XLSX.writeFile(wb, `corte-inventario-${submitted}.xlsx`)
+  }
+
+  const exportPdf = () => {
+    const doc = new jsPDF({ orientation: "landscape" })
+    doc.setFontSize(14)
+    doc.text(`Corte de inventario — ${submitted}`, 14, 15)
+    doc.setFontSize(9)
+    doc.text(`${data.length} productos · ${total} unidades totales`, 14, 22)
+    autoTable(doc, {
+      startY: 27,
+      head: [["Producto", "Categoría", "SKU", `Stock al ${submitted}`, `Costo al ${submitted}`, `Valor al ${submitted}`, "Stock actual"]],
+      body: data.map(p => [
+        p.name, p.category ?? "—", p.sku ?? "—",
+        p.stockAtCutoff,
+        formatCOP(p.costAtCutoff),
+        formatCOP(p.stockAtCutoff * p.costAtCutoff),
+        p.stockNow,
+      ]),
+      styles: { fontSize: 7.5 },
+      headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
+    })
+    doc.save(`corte-inventario-${submitted}.pdf`)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-2xl animate-slide-up flex flex-col max-h-[90vh]"
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-display font-bold text-lg" style={{ color: "var(--text-primary)" }}>
+              Corte de inventario
+            </h2>
+            {submitted && !isFetching && data && (
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {data.length} productos · {total} uds · valor total {formatCOP(totalValor)}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="btn-ghost w-7 h-7 rounded flex items-center justify-center">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <input
+            type="date" value={date} max={today}
+            onChange={e => setDate(e.target.value)}
+            className="input flex-1"
+            style={{ background: "var(--bg-primary)", borderColor: "var(--border)", color: "var(--text-primary)" }}
+          />
+          <button
+            onClick={() => setSubmitted(date)}
+            disabled={isFetching}
+            className="btn-primary btn-md flex items-center gap-2">
+            {isFetching ? <Loader2 size={14} className="animate-spin" /> : <CalendarSearch size={14} />}
+            Consultar
+          </button>
+        </div>
+
+        {data && !isFetching && (
+          <>
+            <div className="flex gap-2 mb-3">
+              <button onClick={exportExcel}
+                className="btn-md flex items-center gap-1.5 text-xs"
+                style={{ background: "#16a34a", color: "#fff", border: "none" }}>
+                <TrendingUp size={13} /> Excel
+              </button>
+              <button onClick={exportPdf}
+                className="btn-md flex items-center gap-1.5 text-xs"
+                style={{ background: "#dc2626", color: "#fff", border: "none" }}>
+                <Package size={13} /> PDF
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs font-medium sticky top-0"
+                    style={{ borderColor: "var(--border)", color: "var(--text-muted)", background: "var(--bg-secondary)" }}>
+                    <th className="text-left px-3 py-2">Producto</th>
+                    <th className="text-left px-3 py-2">Categoría</th>
+                    <th className="text-right px-3 py-2">Stock al {submitted}</th>
+                    <th className="text-right px-3 py-2">Costo al {submitted}</th>
+                    <th className="text-right px-3 py-2">Valor</th>
+                    <th className="text-right px-3 py-2">Stock actual</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((p, i) => (
+                    <tr key={p.id} className="border-b"
+                      style={{ borderColor: "var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg-primary)" }}>
+                      <td className="px-3 py-2 font-medium" style={{ color: "var(--text-primary)" }}>{p.name}</td>
+                      <td className="px-3 py-2 text-xs" style={{ color: "var(--text-muted)" }}>{p.category ?? "—"}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold" style={{ color: "var(--brand)" }}>
+                        {p.stockAtCutoff}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
+                        {formatCOP(p.costAtCutoff)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {formatCOP(p.stockAtCutoff * p.costAtCutoff)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                        {p.stockNow}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {!data && !isFetching && (
+          <div className="flex-1 flex items-center justify-center py-10">
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              Selecciona una fecha y pulsa Consultar
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
