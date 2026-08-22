@@ -1,0 +1,212 @@
+import { app, BrowserWindow, ipcMain } from "electron"
+import { fileURLToPath } from "url"
+import path from "path"
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs"
+import { execSync } from "child_process"
+import { tmpdir } from "os"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const isDev = !app.isPackaged
+
+// ── Config en userData ────────────────────────────────────
+
+function configPath() {
+  return path.join(app.getPath("userData"), "config.json")
+}
+
+function readConfig() {
+  try {
+    if (existsSync(configPath())) return JSON.parse(readFileSync(configPath(), "utf-8"))
+  } catch {}
+  return {}
+}
+
+function writeConfig(cfg) {
+  writeFileSync(configPath(), JSON.stringify(cfg, null, 2), "utf-8")
+}
+
+ipcMain.on("config:get", (event) => {
+  event.returnValue = readConfig()
+})
+
+ipcMain.handle("config:set-server-url", (_, url) => {
+  const cfg = readConfig()
+  cfg.serverUrl = url
+  writeConfig(cfg)
+})
+
+ipcMain.on("config:relaunch", () => {
+  app.relaunch()
+  app.exit(0)
+})
+
+// ── Impresora — helpers nativos ───────────────────────────
+
+// ESC p 0 25 250 — pulso 50ms en pin 2 (estándar cajón POS)
+const DRAWER_BYTES = [0x1B, 0x70, 0x00, 0x19, 0xFA]
+
+function listSystemPrinters() {
+  try {
+    if (process.platform === "win32") {
+      const out = execSync(
+        'powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"',
+        { encoding: "utf-8", timeout: 5000 }
+      )
+      return out.trim().split(/\r?\n/).map(n => n.trim()).filter(Boolean)
+    } else {
+      const out = execSync("lpstat -a 2>/dev/null", { encoding: "utf-8", timeout: 5000 })
+      return out.trim().split(/\r?\n/).map(l => l.split(" ")[0]).filter(Boolean)
+    }
+  } catch {
+    return []
+  }
+}
+
+function buildDrawerScript(printerName) {
+  // Sanitizar: solo permitir caracteres seguros en el nombre de impresora
+  const safe = printerName.replace(/[^a-zA-Z0-9 _\-]/g, "")
+  return (
+    'Add-Type -TypeDefinition @"\n' +
+    "using System;\n" +
+    "using System.Runtime.InteropServices;\n" +
+    "public class RawPrinterHelper {\n" +
+    "    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]\n" +
+    "    public class DOCINFOA {\n" +
+    "        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;\n" +
+    "        [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;\n" +
+    "        [MarshalAs(UnmanagedType.LPStr)] public string pDataType;\n" +
+    "    }\n" +
+    '    [DllImport("winspool.Drv", EntryPoint="OpenPrinterA", SetLastError=true)]\n' +
+    "    public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);\n" +
+    '    [DllImport("winspool.Drv", SetLastError=true)]\n' +
+    "    public static extern bool ClosePrinter(IntPtr hPrinter);\n" +
+    '    [DllImport("winspool.Drv", SetLastError=true)]\n' +
+    "    public static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In] DOCINFOA di);\n" +
+    '    [DllImport("winspool.Drv", SetLastError=true)]\n' +
+    "    public static extern bool EndDocPrinter(IntPtr hPrinter);\n" +
+    '    [DllImport("winspool.Drv", SetLastError=true)]\n' +
+    "    public static extern bool StartPagePrinter(IntPtr hPrinter);\n" +
+    '    [DllImport("winspool.Drv", SetLastError=true)]\n' +
+    "    public static extern bool EndPagePrinter(IntPtr hPrinter);\n" +
+    '    [DllImport("winspool.Drv", SetLastError=true)]\n' +
+    "    public static extern bool WritePrinter(IntPtr hPrinter, byte[] bytes, int count, out int written);\n" +
+    "}\n" +
+    '"@\n' +
+    '$printerName = "' + safe + '"\n' +
+    "$bytes = [byte[]](27,112,0,25,250)\n" +
+    "$doc = New-Object RawPrinterHelper+DOCINFOA\n" +
+    '$doc.pDocName = "OpenDrawer"\n' +
+    '$doc.pDataType = "RAW"\n' +
+    "$hPrinter = [IntPtr]::Zero\n" +
+    "if ([RawPrinterHelper]::OpenPrinter($printerName, [ref]$hPrinter, [IntPtr]::Zero)) {\n" +
+    "    [RawPrinterHelper]::StartDocPrinter($hPrinter, 1, $doc) | Out-Null\n" +
+    "    [RawPrinterHelper]::StartPagePrinter($hPrinter) | Out-Null\n" +
+    "    $written = 0\n" +
+    "    [RawPrinterHelper]::WritePrinter($hPrinter, $bytes, $bytes.Length, [ref]$written) | Out-Null\n" +
+    "    [RawPrinterHelper]::EndPagePrinter($hPrinter) | Out-Null\n" +
+    "    [RawPrinterHelper]::EndDocPrinter($hPrinter) | Out-Null\n" +
+    "    [RawPrinterHelper]::ClosePrinter($hPrinter) | Out-Null\n" +
+    "    exit 0\n" +
+    "} else { exit 1 }"
+  )
+}
+
+function openDrawerNative(printerName) {
+  if (process.platform === "win32") {
+    if (!printerName) throw new Error("Nombre de impresora requerido")
+    const script = buildDrawerScript(printerName)
+    const tmp = path.join(tmpdir(), `aukani-drawer-${Date.now()}.ps1`)
+    try {
+      writeFileSync(tmp, script, "utf-8")
+      execSync(`powershell -ExecutionPolicy Bypass -File "${tmp}"`, { timeout: 5000 })
+    } finally {
+      try { unlinkSync(tmp) } catch {}
+    }
+  } else {
+    // Linux/Mac: escribir ESC/POS directo al dispositivo USB
+    const candidates = ["/dev/usb/lp0", "/dev/usb/lp1", "/dev/ttyUSB0"]
+    const dev = candidates.find(d => existsSync(d))
+    if (!dev) throw new Error("No se encontró dispositivo de impresora en /dev/usb/lp*")
+    writeFileSync(dev, Buffer.from(DRAWER_BYTES))
+  }
+}
+
+// ── Impresora — IPC handlers ──────────────────────────────
+
+ipcMain.handle("printer:list", () => {
+  try {
+    return { ok: true, printers: listSystemPrinters(), platform: process.platform }
+  } catch (err) {
+    return { ok: false, error: err.message, printers: [] }
+  }
+})
+
+ipcMain.handle("printer:open-drawer", (_, printerName) => {
+  try {
+    openDrawerNative(printerName)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle("printer:print", async (_, { html, printerName }) => {
+  const tmp = path.join(tmpdir(), `aukani-receipt-${Date.now()}.html`)
+  writeFileSync(tmp, html, "utf-8")
+
+  return new Promise((resolve) => {
+    const printWin = new BrowserWindow({
+      show: false,
+      skipTaskbar: true,
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    })
+
+    printWin.loadFile(tmp)
+
+    printWin.webContents.once("did-finish-load", () => {
+      printWin.webContents.print(
+        { silent: true, deviceName: printerName || "" },
+        (success, reason) => {
+          printWin.close()
+          try { unlinkSync(tmp) } catch {}
+          resolve({ ok: success, error: success ? null : reason })
+        }
+      )
+    })
+  })
+})
+
+// ── Ventana principal ─────────────────────────────────────
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 1024,
+    minHeight: 600,
+    title: "Aukani POS",
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  if (isDev) {
+    win.loadURL("http://localhost:5173")
+    win.webContents.openDevTools()
+  } else {
+    win.loadFile(path.join(__dirname, "../dist/index.html"))
+  }
+}
+
+app.whenReady().then(createWindow)
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit()
+})
+
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow()
+})

@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/server.js",
+    "dev": "NODE_ENV=development nodemon src/server.js",
     "start": "node src/server.js",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:migrate": "NODE_ENV=development prisma migrate dev",
+    "db:generate": "NODE_ENV=development prisma generate",
+    "db:studio": "NODE_ENV=development prisma studio",
+    "db:seed": "NODE_ENV=development node prisma/seed.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

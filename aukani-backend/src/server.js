@@ -1,5 +1,7 @@
 import dotenv from "dotenv"
-if (!process.env.DATABASE_URL) dotenv.config()
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: process.env.NODE_ENV === "development" ? ".env.dev" : ".env" })
+}
 import Fastify from "fastify"
 import cors from "@fastify/cors"
 import rateLimit from "@fastify/rate-limit"
