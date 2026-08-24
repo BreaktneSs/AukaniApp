@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { usersService } from "@/services/users.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
-import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad, Edit2, Key, UserX, UserCheck, ChevronUp, ChevronDown, Eye, EyeOff } from "lucide-react"
+import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad, Edit2, Key, UserX, UserCheck, ChevronUp, ChevronDown, Eye, EyeOff, ShieldCheck, ShieldOff, ShieldAlert } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 import { agentService } from "@/services/agent.service"
@@ -25,19 +25,169 @@ const ALL_TABS = [
 // ── Mi cuenta ────────────────────────────────────────────
 const DOMAIN_LABEL = "@aukani.com"
 
+// Modal para confirmar password antes de desactivar 2FA
+function Disable2FAModal({ onClose, onSave, loading }) {
+  const [password, setPassword] = useState("")
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-xs animate-slide-up space-y-4" onClick={e => e.stopPropagation()}>
+        <h2 className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+          Desactivar verificación en dos pasos
+        </h2>
+        <form onSubmit={e => { e.preventDefault(); onSave(password) }} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirma tu contraseña</label>
+            <input type="password" required autoFocus className="input"
+              value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button type="submit" disabled={loading} className="btn-md flex-1 text-white"
+              style={{ background: "var(--danger)" }}>
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <ShieldOff size={14} />}
+              Desactivar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function TwoFactorCard() {
+  const { user, setUser } = useAuthStore()
+  const [setupData, setSetupData] = useState(null) // { qrDataUrl, secret } mientras se está activando
+  const [code, setCode] = useState("")
+  const [showDisableModal, setShowDisableModal] = useState(false)
+
+  const setup = useMutation({
+    mutationFn: usersService.setup2FA,
+    onSuccess: (data) => setSetupData(data),
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  const confirm = useMutation({
+    mutationFn: () => usersService.confirm2FA(code),
+    onSuccess: () => {
+      toast.success("Verificación en dos pasos activada")
+      setUser({ ...user, totpEnabled: true })
+      setSetupData(null)
+      setCode("")
+    },
+    onError: e => toast.error(e.response?.data?.error || "Código incorrecto"),
+  })
+
+  const disable = useMutation({
+    mutationFn: (password) => usersService.disable2FA(password),
+    onSuccess: () => {
+      toast.success("Verificación en dos pasos desactivada")
+      setUser({ ...user, totpEnabled: false })
+      setShowDisableModal(false)
+    },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
+
+  if (user?.totpEnabled) {
+    return (
+      <div className="card p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+          Verificación en dos pasos
+        </p>
+        <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: "var(--brand-light)" }}>
+          <ShieldCheck size={18} style={{ color: "var(--brand)" }} />
+          <p className="text-sm font-medium" style={{ color: "var(--brand)" }}>Activada</p>
+        </div>
+        <button onClick={() => setShowDisableModal(true)} className="btn-outline btn-sm w-full"
+          style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
+          Desactivar
+        </button>
+        {showDisableModal && (
+          <Disable2FAModal
+            onClose={() => setShowDisableModal(false)}
+            loading={disable.isPending}
+            onSave={(password) => disable.mutate(password)}
+          />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="card p-4 space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+        Verificación en dos pasos
+      </p>
+
+      {!setupData ? (
+        <>
+          <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: "var(--bg-tertiary)" }}>
+            <ShieldAlert size={18} style={{ color: "var(--text-muted)" }} />
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>No está activada</p>
+          </div>
+          <button onClick={() => setup.mutate()} disabled={setup.isPending} className="btn-primary btn-sm w-full">
+            {setup.isPending ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+            Activar verificación en dos pasos
+          </button>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            Escanea el QR con tu app de autenticación (Google Authenticator, Authy, etc.) y confirma con el código generado.
+          </p>
+          <div className="flex justify-center p-3 rounded-xl" style={{ background: "white" }}>
+            <img src={setupData.qrDataUrl} alt="QR de verificación en dos pasos" width={160} height={160} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              ¿No puedes escanear? Ingresa este código manualmente:
+            </label>
+            <p className="text-xs font-mono px-2 py-1.5 rounded"
+              style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", wordBreak: "break-all" }}>
+              {setupData.secret}
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+              Código de confirmación
+            </label>
+            <input
+              type="text" inputMode="numeric" maxLength={6}
+              className="input text-center tracking-[0.4em] font-semibold"
+              placeholder="000000"
+              value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setSetupData(null); setCode("") }}
+              className="btn-outline btn-sm flex-1">Cancelar</button>
+            <button onClick={() => confirm.mutate()} disabled={confirm.isPending || code.length !== 6}
+              className="btn-primary btn-sm flex-1">
+              {confirm.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+              Confirmar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MyAccountTab() {
   const { user } = useAuthStore()
   const [current, setCurrent]   = useState("")
   const [next, setNext]         = useState("")
   const [confirm_, setConfirm]  = useState("")
+  const [totpCode, setTotpCode] = useState("")
   const [showCurrent, setShowCurrent] = useState(false)
   const [showNext, setShowNext]       = useState(false)
 
   const change = useMutation({
-    mutationFn: () => usersService.changeOwnPassword(current, next),
+    mutationFn: () => usersService.changeOwnPassword(current, next, totpCode),
     onSuccess: () => {
       toast.success("Contraseña actualizada")
-      setCurrent(""); setNext(""); setConfirm("")
+      setCurrent(""); setNext(""); setConfirm(""); setTotpCode("")
     },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
@@ -102,6 +252,20 @@ function MyAccountTab() {
               </div>
             </div>
           ))}
+          {user?.totpEnabled && (
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                Código de verificación en dos pasos
+              </label>
+              <input
+                type="text" inputMode="numeric" maxLength={6} required
+                className="input text-center tracking-[0.4em] font-semibold"
+                placeholder="000000"
+                value={totpCode}
+                onChange={e => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+            </div>
+          )}
           <button type="submit" disabled={change.isPending}
             className="btn-primary btn-md w-full flex items-center justify-center gap-2">
             {change.isPending ? <Loader2 size={14} className="animate-spin" /> : <Key size={14} />}
@@ -109,6 +273,9 @@ function MyAccountTab() {
           </button>
         </form>
       </div>
+
+      {/* Verificación en dos pasos — solo ADMIN/JEFE */}
+      {(user?.role === "ADMIN" || user?.role === "JEFE") && <TwoFactorCard />}
     </div>
   )
 }
@@ -405,6 +572,11 @@ function UsersTab() {
     onSuccess: () => { toast.success("Usuario reactivado"); invalidate() },
     onError: e => toast.error(e.response?.data?.error || "Error"),
   })
+  const adminDisable2FA = useMutation({
+    mutationFn: usersService.adminDisable2FA,
+    onSuccess: () => { toast.success("Verificación en dos pasos desactivada"); invalidate() },
+    onError: e => toast.error(e.response?.data?.error || "Error"),
+  })
 
   const handleRoleShift = (u, direction) => {
     const idx = ROLE_ORDER.indexOf(u.role)
@@ -470,6 +642,11 @@ function UsersTab() {
                         Inactivo
                       </span>
                     )}
+                    {u.totpEnabled && (
+                      <span className="badge text-xs flex items-center gap-1" style={{ color: "var(--brand)", background: "var(--brand-light)" }}>
+                        <ShieldCheck size={11} /> 2FA
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
                     {username(u.email)}<span style={{ color: "var(--border)" }}>{DOMAIN}</span>
@@ -512,6 +689,15 @@ function UsersTab() {
                         style={{ color: "var(--warning)" }}>
                         <Key size={13} />
                       </button>
+                      {u.totpEnabled && (
+                        <button
+                          onClick={() => confirm({ title: `¿Desactivar 2FA de ${u.name}?`, message: "Úsalo solo si perdió acceso a su app de autenticación.", confirmLabel: "Desactivar", variant: "warning" }).then(ok => { if (ok) adminDisable2FA.mutate(u.id) })}
+                          title="Desactivar verificación en dos pasos"
+                          className="btn-ghost w-8 h-8 rounded flex items-center justify-center"
+                          style={{ color: "var(--danger)" }}>
+                          <ShieldOff size={13} />
+                        </button>
+                      )}
                     </>
                   )}
                   {!isMe && (

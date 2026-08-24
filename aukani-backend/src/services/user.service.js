@@ -5,7 +5,7 @@ export const userService = {
   async getAll({ includeInactive = false } = {}) {
     return prisma.user.findMany({
       where: includeInactive ? {} : { active: true },
-      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, active: true, totpEnabled: true, createdAt: true },
       orderBy: [{ active: "desc" }, { name: "asc" }],
     })
   },
@@ -13,7 +13,7 @@ export const userService = {
   async getById(id) {
     return prisma.user.findUnique({
       where: { id },
-      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, active: true, totpEnabled: true, createdAt: true },
     })
   },
 
@@ -42,6 +42,14 @@ export const userService = {
       where: { id },
       data: { password: hashed },
       select: { id: true, name: true },
+    })
+  },
+
+  async adminDisable2FA(id) {
+    return prisma.user.update({
+      where: { id },
+      data: { totpSecret: null, totpEnabled: false },
+      select: { id: true, name: true, totpEnabled: true },
     })
   },
 

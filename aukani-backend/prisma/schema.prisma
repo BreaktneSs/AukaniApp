@@ -49,6 +49,8 @@ model User {
   password  String
   role      Role     @default(VENDEDOR)
   active    Boolean  @default(true)
+  totpSecret  String?
+  totpEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -540,6 +542,11 @@ enum AuditAction {
   RESERVATION_CREATE
   RESERVATION_COMPLETE
   RESERVATION_CANCEL
+  LOGIN_2FA_SUCCESS
+  LOGIN_2FA_FAIL
+  TWOFA_ENABLED
+  TWOFA_DISABLED
+  TWOFA_ADMIN_DISABLED
 }
 
 enum AuditEntity {

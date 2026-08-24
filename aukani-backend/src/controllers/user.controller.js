@@ -51,6 +51,16 @@ export const userController = {
     return reply.send(result)
   },
 
+  async adminDisable2FA(req, reply) {
+    const result = await userService.adminDisable2FA(Number(req.params.id))
+    auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "TWOFA_ADMIN_DISABLED", entity: "USER", entityId: result.id,
+      entityLabel: result.name, ip: ip(req),
+    })
+    return reply.send(result)
+  },
+
   async deactivate(req, reply) {
     if (Number(req.params.id) === req.user.id)
       return reply.status(400).send({ error: "No puedes desactivar tu propia cuenta" })

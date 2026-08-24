@@ -1,5 +1,6 @@
 deploy.sh
 DEPLOYMENT.md
+TOTP-2FA-PLAN.md
 node_modules/
 */node_modules/
 */release/

@@ -57,6 +57,9 @@ app.get("/downloads/:filename", async (req, reply) => {
     .sendFile(filename, path.join(__dirname, "..", "downloads"))
 })
 
+// ── Error handler ────────────────────────────────────────
+app.setErrorHandler(errorHandler)
+
 // ── Routes ───────────────────────────────────────────────
 await app.register(authRoutes)
 await app.register(userRoutes)
@@ -71,9 +74,6 @@ await app.register(expenseRoutes)
 await app.register(reservationRoutes)
 await app.register(purchaseRoutes)
 await app.register(auditRoutes)
-
-// ── Error handler ────────────────────────────────────────
-app.setErrorHandler(errorHandler)
 
 // ── Health check ─────────────────────────────────────────
 app.get("/", async () => ({ status: "Aukani POS API running", version: "2.0.0" }))
