@@ -1,6 +1,8 @@
 {
   "name": "aukani-electron",
   "version": "1.0.0",
+  "description": "Aukani POS - Sistema de punto de venta",
+  "author": "Aukani",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -9,6 +11,7 @@
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "electron:build": "vite build && electron-builder",
+    "electron:build:win": "vite build && electron-builder --win",
     "electron:preview": "electron ."
   },
   "build": {
@@ -25,12 +28,20 @@
       "target": [
         "AppImage"
       ],
-      "category": "Office"
+      "category": "Office",
+      "icon": "build/icon.png"
     },
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   },
   "dependencies": {
