@@ -177,7 +177,11 @@ export default function LoginPage() {
       login(result.user, result.token)
       navigate("/pos")
     } catch (err) {
-      toast.error(err.response?.data?.error || "Credenciales incorrectas")
+      if (err.response) {
+        toast.error(err.response.data?.error || "Credenciales incorrectas")
+      } else {
+        toast.error("No se pudo conectar al servidor")
+      }
     } finally {
       setLoading(false)
     }

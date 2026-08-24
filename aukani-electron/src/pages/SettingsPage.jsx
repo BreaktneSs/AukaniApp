@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { usersService } from "@/services/users.service"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
-import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad, Edit2, Key, UserX, UserCheck, ChevronUp, ChevronDown, Eye, EyeOff, ShieldCheck, ShieldOff, ShieldAlert } from "lucide-react"
+import { Plus, Loader2, CheckCircle, XCircle, Sun, Moon, Touchpad, Edit2, Key, UserX, UserCheck, ChevronUp, ChevronDown, Eye, EyeOff, ShieldCheck, ShieldOff, ShieldAlert, Link2, Unlink } from "lucide-react"
 import { formatCOP } from "@/utils/currency"
 import toast from "react-hot-toast"
 import { printerService } from "@/services/printer.service"
@@ -20,6 +20,7 @@ const ALL_TABS = [
   { name: "Negocio",         roles: ["ADMIN", "JEFE"] },
   { name: "Impresora",       roles: ["ADMIN", "JEFE", "VENDEDOR"] },
   { name: "Servidor",        roles: ["ADMIN"], electron: true },
+  { name: "Acceso remoto",   roles: ["ADMIN"], electron: true },
   { name: "Usuarios",        roles: ["ADMIN"] },
   { name: "Categorías",      roles: ["ADMIN", "JEFE"] },
   { name: "Métodos de pago", roles: ["ADMIN", "JEFE"] },
@@ -1042,6 +1043,138 @@ function ServerTab() {
   )
 }
 
+// ── Acceso remoto — túnel SSH SOCKS5 (solo ADMIN) ──────────
+function RemoteAccessTab() {
+  const { user } = useAuthStore()
+  const saved = window.electronAPI?.remoteAccessConfig || {}
+  const defaultUsername = saved.username || user?.email?.split("@")[0] || ""
+
+  const [host, setHost] = useState(saved.host || "")
+  const [port, setPort] = useState(saved.port || "22")
+  const [username, setUsername] = useState(defaultUsername)
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [state, setState] = useState("checking") // checking | idle | connecting | connected | error
+  const [error, setError] = useState("")
+
+  // Al montar: el túnel puede ya estar activo (ej. se conectó desde el login)
+  useState(() => {
+    window.electronAPI.remoteStatus().then(({ connected, info }) => {
+      if (connected && info) {
+        setHost(info.host); setPort(String(info.port)); setUsername(info.username)
+        setState("connected")
+      } else {
+        setState("idle")
+      }
+    })
+  })
+
+  const handleConnect = async (e) => {
+    e.preventDefault()
+    setState("connecting")
+    setError("")
+    const result = await window.electronAPI.remoteConnect({ host: host.trim(), port, username: username.trim(), password })
+    if (result.ok) {
+      setState("connected")
+      setPassword("")
+      toast.success("Túnel remoto conectado")
+    } else {
+      setState("error")
+      setError(result.error || "No se pudo conectar")
+    }
+  }
+
+  const handleDisconnect = async () => {
+    await window.electronAPI.remoteDisconnect()
+    setState("idle")
+    toast.success("Desconectado — volviste a la red local")
+  }
+
+  return (
+    <div className="max-w-sm space-y-4">
+      <div className="card p-4 space-y-1" style={{ background: "var(--brand-light)", borderColor: "var(--brand)" }}>
+        <p className="text-xs font-semibold" style={{ color: "var(--brand)" }}>Túnel SSH (SOCKS5)</p>
+        <p className="text-xs" style={{ color: "var(--brand)" }}>
+          Conecta a la app al servidor cuando no estás en la red local. La contraseña nunca se guarda en este equipo.
+        </p>
+      </div>
+
+      {state === "checking" ? (
+        <div className="flex justify-center py-6">
+          <Loader2 size={20} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+        </div>
+      ) : state === "connected" ? (
+        <div className="space-y-3">
+          <div className="card p-4 flex items-center gap-3" style={{ background: "var(--brand-light)" }}>
+            <Link2 size={18} style={{ color: "var(--brand)" }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--brand)" }}>Conectado</p>
+              <p className="text-xs" style={{ color: "var(--brand)" }}>{username}@{host}:{port}</p>
+            </div>
+          </div>
+          <button onClick={handleDisconnect} className="btn-outline btn-md w-full flex items-center justify-center gap-2"
+            style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>
+            <Unlink size={14} /> Desconectar
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleConnect} className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Host</label>
+              <input type="text" className="input" required placeholder="192.168.0.101"
+                value={host} onChange={e => setHost(e.target.value)}
+                disabled={state === "connecting"} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Puerto</label>
+              <input type="text" inputMode="numeric" className="input" required placeholder="22"
+                value={port} onChange={e => setPort(e.target.value.replace(/\D/g, ""))}
+                disabled={state === "connecting"} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Usuario SSH</label>
+            <input type="text" className="input" required
+              value={username} onChange={e => setUsername(e.target.value)}
+              disabled={state === "connecting"} />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Contraseña</label>
+            <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+              <input
+                type={showPassword ? "text" : "password"} required autoComplete="off"
+                className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                value={password} onChange={e => setPassword(e.target.value)}
+                disabled={state === "connecting"} placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowPassword(v => !v)}
+                className="px-3 flex items-center" style={{ background: "var(--bg-secondary)", borderLeft: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+
+          {state === "error" && (
+            <div className="card px-3 py-2" style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}>
+              <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+            </div>
+          )}
+
+          <button type="submit" disabled={state === "connecting"}
+            className="btn-primary btn-md w-full flex items-center justify-center gap-2">
+            {state === "connecting" ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+            {state === "connecting" ? "Conectando..." : "Conectar"}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 // ── Configuración del negocio ─────────────────────────────
 function BusinessTab() {
   const STORAGE_KEY = "aukani_business"
@@ -1118,6 +1251,7 @@ export default function SettingsPage() {
 
       <div className="animate-fade-in">
         {activeTab === "Servidor"        && <ServerTab />}
+        {activeTab === "Acceso remoto"   && <RemoteAccessTab />}
         {activeTab === "Mi cuenta"        && <MyAccountTab />}
         {activeTab === "General"         && <GeneralTab />}
         {activeTab === "Negocio"         && <BusinessTab />}

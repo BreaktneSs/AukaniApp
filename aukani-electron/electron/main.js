@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain } from "electron"
+import { app, BrowserWindow, ipcMain, session } from "electron"
 import { fileURLToPath } from "url"
 import path from "path"
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs"
 import { execSync } from "child_process"
 import { tmpdir } from "os"
+import net from "net"
+import { Client as SSHClient } from "ssh2"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
@@ -176,6 +178,145 @@ ipcMain.handle("printer:print", async (_, { html, printerName }) => {
   })
 })
 
+// ── Acceso remoto — túnel SSH + SOCKS5 (solo ADMIN, desde la UI) ──
+
+let sshClient = null
+let socksServer = null
+let activeConnectionInfo = null
+
+// Servidor SOCKS5 mínimo: solo CMD CONNECT, sin autenticación (escucha únicamente
+// en 127.0.0.1 — el único "cliente" real es la propia sesión de Electron).
+function startSocksServer(client) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer((socket) => {
+      let stage = "greeting"
+      let buffer = Buffer.alloc(0)
+      socket.on("error", () => {})
+
+      const onData = (chunk) => {
+        buffer = Buffer.concat([buffer, chunk])
+
+        if (stage === "greeting") {
+          if (buffer.length < 2) return
+          const nMethods = buffer[1]
+          if (buffer.length < 2 + nMethods) return
+          buffer = buffer.subarray(2 + nMethods)
+          socket.write(Buffer.from([0x05, 0x00])) // versión 5, sin autenticación
+          stage = "request"
+        }
+
+        if (stage === "request") {
+          if (buffer.length < 4) return
+          const atyp = buffer[3]
+          let addr, offset
+
+          if (atyp === 0x01) { // IPv4
+            if (buffer.length < 10) return
+            addr = `${buffer[4]}.${buffer[5]}.${buffer[6]}.${buffer[7]}`
+            offset = 8
+          } else if (atyp === 0x03) { // dominio
+            if (buffer.length < 5) return
+            const len = buffer[4]
+            if (buffer.length < 5 + len + 2) return
+            addr = buffer.subarray(5, 5 + len).toString("utf-8")
+            offset = 5 + len
+          } else if (atyp === 0x04) { // IPv6
+            if (buffer.length < 22) return
+            const parts = []
+            for (let i = 0; i < 16; i += 2) parts.push(buffer.readUInt16BE(4 + i).toString(16))
+            addr = parts.join(":")
+            offset = 20
+          } else {
+            socket.end(Buffer.from([0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0]))
+            return
+          }
+
+          const dstPort = buffer.readUInt16BE(offset)
+          socket.removeListener("data", onData)
+          stage = "streaming"
+
+          client.forwardOut("127.0.0.1", socket.remotePort, addr, dstPort, (err, stream) => {
+            if (err) {
+              try { socket.end(Buffer.from([0x05, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0])) } catch {}
+              return
+            }
+            socket.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]))
+            socket.pipe(stream)
+            stream.pipe(socket)
+            stream.on("error", () => socket.destroy())
+            socket.on("error", () => stream.destroy())
+          })
+        }
+      }
+
+      socket.on("data", onData)
+    })
+
+    server.on("error", reject)
+    server.listen(0, "127.0.0.1", () => resolve(server))
+  })
+}
+
+function connectRemoteTunnel({ host, port, username, password }) {
+  if (sshClient) throw new Error("Ya hay una conexión remota activa")
+
+  return new Promise((resolve, reject) => {
+    const client = new SSHClient()
+
+    client.on("ready", async () => {
+      try {
+        const server = await startSocksServer(client)
+        const socksPort = server.address().port
+        await session.defaultSession.setProxy({ proxyRules: `socks5://127.0.0.1:${socksPort}` })
+
+        sshClient = client
+        socksServer = server
+        activeConnectionInfo = { host, port: Number(port) || 22, username }
+
+        client.on("close", () => {
+          if (sshClient === client) disconnectRemoteTunnel().catch(() => {})
+        })
+
+        resolve({ ok: true })
+      } catch (err) {
+        client.end()
+        reject(err)
+      }
+    })
+
+    client.on("error", (err) => reject(err))
+
+    client.connect({
+      host, port: Number(port) || 22, username, password,
+      readyTimeout: 15000, tryKeyboardInteractive: false,
+    })
+  })
+}
+
+async function disconnectRemoteTunnel() {
+  try { await session.defaultSession.setProxy({ mode: "direct" }) } catch {}
+  if (socksServer) { try { socksServer.close() } catch {}; socksServer = null }
+  if (sshClient) { try { sshClient.end() } catch {}; sshClient = null }
+  activeConnectionInfo = null
+  return { ok: true }
+}
+
+ipcMain.handle("remote:connect", async (_, cfg) => {
+  const { host, port, username, password } = cfg
+  try {
+    const stored = readConfig()
+    stored.remoteAccess = { host, port, username }
+    writeConfig(stored)
+    return await connectRemoteTunnel({ host, port, username, password })
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle("remote:disconnect", () => disconnectRemoteTunnel())
+
+ipcMain.handle("remote:status", () => ({ connected: !!sshClient, info: activeConnectionInfo }))
+
 // ── Ventana principal ─────────────────────────────────────
 
 function createWindow() {
@@ -205,7 +346,9 @@ function createWindow() {
 app.whenReady().then(createWindow)
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit()
+  disconnectRemoteTunnel().finally(() => {
+    if (process.platform !== "darwin") app.quit()
+  })
 })
 
 app.on("activate", () => {

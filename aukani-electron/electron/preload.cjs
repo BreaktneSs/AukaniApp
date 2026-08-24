@@ -15,4 +15,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   printerList:      ()               => ipcRenderer.invoke("printer:list"),
   printerOpenDrawer:(name)           => ipcRenderer.invoke("printer:open-drawer", name),
   printerPrint:     (html, name)     => ipcRenderer.invoke("printer:print", { html, name }),
+
+  // ── Acceso remoto (túnel SSH + SOCKS5) ────────────────
+  remoteAccessConfig: config.remoteAccess || null,
+  remoteConnect:      (cfg)          => ipcRenderer.invoke("remote:connect", cfg),
+  remoteDisconnect:   ()             => ipcRenderer.invoke("remote:disconnect"),
+  remoteStatus:       ()             => ipcRenderer.invoke("remote:status"),
 })

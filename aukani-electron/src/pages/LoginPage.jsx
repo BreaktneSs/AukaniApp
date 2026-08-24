@@ -3,8 +3,104 @@ import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/auth.store"
 import { useThemeStore } from "@/store/theme.store"
 import { authService } from "@/services/auth.service"
-import { Sun, Moon, Loader2, ShieldCheck, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react"
+import { Sun, Moon, Loader2, ShieldCheck, ArrowLeft, KeyRound, Eye, EyeOff, Link2 } from "lucide-react"
 import toast from "react-hot-toast"
+import { confirm } from "@/components/ui/ConfirmDialog"
+
+// Modal "Acceso remoto" — para cuando no hay conexión con el servidor (fuera de la LAN)
+function RemoteAccessModal({ onClose, onConnected }) {
+  const saved = window.electronAPI?.remoteAccessConfig || {}
+  const [host, setHost] = useState(saved.host || "")
+  const [port, setPort] = useState(saved.port || "22")
+  const [username, setUsername] = useState(saved.username || "")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleConnect = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+    const result = await window.electronAPI.remoteConnect({ host: host.trim(), port, username: username.trim(), password })
+    setLoading(false)
+    if (result.ok) {
+      toast.success("Túnel remoto conectado")
+      onConnected()
+    } else {
+      setError(result.error || "No se pudo conectar")
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-sm animate-slide-up space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2">
+          <Link2 size={18} style={{ color: "var(--brand)" }} />
+          <h2 className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+            Acceso remoto
+          </h2>
+        </div>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Conecta por túnel SSH para llegar al servidor cuando no estás en la red local. Al conectar, se reintenta el inicio de sesión automáticamente.
+        </p>
+
+        <form onSubmit={handleConnect} className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Host</label>
+              <input type="text" className="input" required autoFocus placeholder="192.168.0.101"
+                value={host} onChange={e => setHost(e.target.value)} disabled={loading} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Puerto</label>
+              <input type="text" inputMode="numeric" className="input" required placeholder="22"
+                value={port} onChange={e => setPort(e.target.value.replace(/\D/g, ""))} disabled={loading} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Usuario SSH</label>
+            <input type="text" className="input" required
+              value={username} onChange={e => setUsername(e.target.value)} disabled={loading} />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Contraseña SSH</label>
+            <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+              <input
+                type={showPassword ? "text" : "password"} required autoComplete="off"
+                className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                value={password} onChange={e => setPassword(e.target.value)}
+                disabled={loading} placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowPassword(v => !v)}
+                className="px-3 flex items-center" style={{ background: "var(--bg-secondary)", borderLeft: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="card px-3 py-2" style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}>
+              <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} disabled={loading} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button type="submit" disabled={loading} className="btn-primary btn-md flex-1 flex items-center justify-center gap-2">
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+              {loading ? "Conectando..." : "Conectar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 // Modal "Olvidé mi contraseña" — solo funciona si la cuenta tiene TOTP activo
 function ForgotPasswordModal({ onClose }) {
@@ -158,12 +254,12 @@ export default function LoginPage() {
   const [tempToken, setTempToken] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showForgotModal, setShowForgotModal] = useState(false)
+  const [showRemoteModal, setShowRemoteModal] = useState(false)
   const { login } = useAuthStore()
   const { theme, toggle } = useThemeStore()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const attemptLogin = async () => {
     if (!username || !password) return
     setLoading(true)
     try {
@@ -177,10 +273,26 @@ export default function LoginPage() {
       login(result.user, result.token)
       navigate("/pos")
     } catch (err) {
-      toast.error(err.response?.data?.error || "Credenciales incorrectas")
+      if (err.response) {
+        toast.error(err.response.data?.error || "Credenciales incorrectas")
+      } else {
+        // No hubo respuesta del servidor — probablemente estás fuera de la red local
+        const wantsRemote = await confirm({
+          title: "No se pudo conectar al servidor",
+          message: "Parece que no tienes acceso a la red local. ¿Quieres conectar por acceso remoto?",
+          confirmLabel: "Conectar acceso remoto",
+          variant: "brand",
+        })
+        if (wantsRemote) setShowRemoteModal(true)
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    attemptLogin()
   }
 
   const handleVerify2FA = async (e) => {
@@ -330,6 +442,12 @@ export default function LoginPage() {
       </div>
 
       {showForgotModal && <ForgotPasswordModal onClose={() => setShowForgotModal(false)} />}
+      {showRemoteModal && (
+        <RemoteAccessModal
+          onClose={() => setShowRemoteModal(false)}
+          onConnected={() => { setShowRemoteModal(false); attemptLogin() }}
+        />
+      )}
     </div>
   )
 }
