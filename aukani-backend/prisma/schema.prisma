@@ -547,6 +547,7 @@ enum AuditAction {
   TWOFA_ENABLED
   TWOFA_DISABLED
   TWOFA_ADMIN_DISABLED
+  PASSWORD_RESET_TOTP
 }
 
 enum AuditEntity {

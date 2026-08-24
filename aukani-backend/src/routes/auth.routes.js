@@ -21,4 +21,7 @@ export async function authRoutes(fastify) {
   fastify.get("/auth/2fa/setup",   { preHandler: [authenticate] }, authController.setup2FA)
   fastify.post("/auth/2fa/confirm",{ preHandler: [authenticate] }, authController.confirm2FA)
   fastify.post("/auth/2fa/disable",{ preHandler: [authenticate] }, authController.disable2FA)
+
+  fastify.post("/auth/forgot-password/check", { config: loginRateLimit }, authController.canResetWithTotp)
+  fastify.post("/auth/forgot-password/reset", { config: loginRateLimit }, authController.resetPasswordWithTotp)
 }

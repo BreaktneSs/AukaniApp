@@ -102,4 +102,30 @@ export const authService = {
     if (!valid) throw { statusCode: 401, message: "La contraseña actual es incorrecta" }
     await prisma.user.update({ where: { id: userId }, data: { totpSecret: null, totpEnabled: false } })
   },
+
+  // ── Restablecer password desde login (solo con TOTP) ──────
+
+  async canResetWithTotp(email) {
+    const user = await prisma.user.findUnique({ where: { email } })
+    // No revelar si el email existe — misma respuesta si no existe o no tiene 2FA
+    return { totpEnabled: !!(user && user.active && user.totpEnabled) }
+  },
+
+  async resetPasswordWithTotp(email, code, newPassword) {
+    if (!newPassword || newPassword.length < 6)
+      throw { statusCode: 400, message: "La nueva contraseña debe tener al menos 6 caracteres" }
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user || !user.active || !user.totpEnabled) {
+      throw { statusCode: 400, message: "Esta cuenta no tiene verificación en dos pasos activa. Contacta a un administrador." }
+    }
+
+    if (!totpService.verify(user.totpSecret, code)) {
+      throw { statusCode: 401, message: "Código incorrecto" }
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10)
+    await prisma.user.update({ where: { id: user.id }, data: { password: hashed } })
+    return { id: user.id, name: user.name, role: user.role }
+  },
 }

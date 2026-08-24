@@ -72,4 +72,21 @@ export const authController = {
     })
     return reply.send({ ok: true })
   },
+
+  async canResetWithTotp(req, reply) {
+    const { email } = req.body
+    const result = await authService.canResetWithTotp(email)
+    return reply.send(result)
+  },
+
+  async resetPasswordWithTotp(req, reply) {
+    const { email, code, newPassword } = req.body
+    const user = await authService.resetPasswordWithTotp(email, code, newPassword)
+    auditService.log({
+      userId: user.id, userName: user.name, userRole: user.role,
+      action: "PASSWORD_RESET_TOTP", entity: "USER", entityId: user.id,
+      entityLabel: user.name, ip: ip(req),
+    })
+    return reply.send({ ok: true })
+  },
 }

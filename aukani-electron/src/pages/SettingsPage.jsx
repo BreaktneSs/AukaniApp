@@ -864,6 +864,7 @@ function SimpleListTab({ queryKey, fetchFn, createFn, deleteFn, label, minItems 
 
 // ── Configuración de impresora (nativa Electron) ─────────
 function PrinterTab() {
+  const { user } = useAuthStore()
   const saved = printerService.getConfig()
   const [printers, setPrinters]         = useState([])
   const [selected, setSelected]         = useState(saved.name || "")
@@ -944,28 +945,30 @@ function PrinterTab() {
         )}
       </div>
 
-      {/* Cajón de efectivo */}
-      <div className="card p-4 space-y-3">
-        <div>
-          <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Cajón de efectivo</p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Envía el pulso ESC/POS directamente vía Windows Spooler.
-            {!selected && " Selecciona una impresora primero."}
-          </p>
+      {/* Cajón de efectivo — solo ADMIN */}
+      {user?.role === "ADMIN" && (
+        <div className="card p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Cajón de efectivo</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Envía el pulso ESC/POS directamente vía Windows Spooler.
+              {!selected && " Selecciona una impresora primero."}
+            </p>
+          </div>
+          <button
+            onClick={testDrawer}
+            disabled={!selected || testState !== "idle"}
+            className="btn-outline btn-md w-full flex items-center justify-center gap-2"
+            style={testState === "ok" ? { color: "var(--brand)", borderColor: "var(--brand)" }
+                 : testState === "error" ? { color: "var(--danger)", borderColor: "var(--danger)" } : {}}>
+            {testState === "ok"    && <CheckCircle size={14} />}
+            {testState === "error" && <XCircle size={14} />}
+            {testState === "idle"  && "Probar cajón"}
+            {testState === "ok"    && "Cajón abierto"}
+            {testState === "error" && "Error al abrir"}
+          </button>
         </div>
-        <button
-          onClick={testDrawer}
-          disabled={!selected || testState !== "idle"}
-          className="btn-outline btn-md w-full flex items-center justify-center gap-2"
-          style={testState === "ok" ? { color: "var(--brand)", borderColor: "var(--brand)" }
-               : testState === "error" ? { color: "var(--danger)", borderColor: "var(--danger)" } : {}}>
-          {testState === "ok"    && <CheckCircle size={14} />}
-          {testState === "error" && <XCircle size={14} />}
-          {testState === "idle"  && "Probar cajón"}
-          {testState === "ok"    && "Cajón abierto"}
-          {testState === "error" && "Error al abrir"}
-        </button>
-      </div>
+      )}
 
     </div>
   )

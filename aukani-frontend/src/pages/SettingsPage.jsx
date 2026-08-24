@@ -861,6 +861,7 @@ function SimpleListTab({ queryKey, fetchFn, createFn, deleteFn, label, minItems 
 
 // ── Configuración de impresora / agente ──────────────────
 function PrinterTab() {
+  const { user } = useAuthStore()
   const [status, setStatus] = useState(null)
   const [checking, setChecking] = useState(false)
   const [printers, setPrinters] = useState([])
@@ -936,7 +937,7 @@ function PrinterTab() {
             {checking ? <Loader2 size={13} className="animate-spin" /> : null}
             {checking ? "Verificando..." : "Verificar conexión"}
           </button>
-          {status?.ok && (
+          {status?.ok && user?.role === "ADMIN" && (
             <button onClick={testDrawer} className="btn-sm flex-1"
               style={{ background: "var(--brand-light)", color: "var(--brand)", border: "1px solid var(--brand)" }}>
               Probar cajón

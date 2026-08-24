@@ -3,8 +3,152 @@ import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/auth.store"
 import { useThemeStore } from "@/store/theme.store"
 import { authService } from "@/services/auth.service"
-import { Sun, Moon, Loader2, ShieldCheck, ArrowLeft } from "lucide-react"
+import { Sun, Moon, Loader2, ShieldCheck, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react"
 import toast from "react-hot-toast"
+
+// Modal "Olvidé mi contraseña" — solo funciona si la cuenta tiene TOTP activo
+function ForgotPasswordModal({ onClose }) {
+  const [step, setStep] = useState("email") // "email" | "reset"
+  const [username, setUsername] = useState("")
+  const [code, setCode] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const email = `${username.trim()}@aukani.com`
+
+  const handleCheck = async (e) => {
+    e.preventDefault()
+    if (!username.trim()) return
+    setLoading(true)
+    try {
+      const { totpEnabled } = await authService.canResetWithTotp(email)
+      if (!totpEnabled) {
+        toast.error("No puedes restablecer tu contraseña. Contacta a un administrador.")
+        onClose()
+        return
+      }
+      setStep("reset")
+    } catch {
+      toast.error("No puedes restablecer tu contraseña. Contacta a un administrador.")
+      onClose()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleReset = async (e) => {
+    e.preventDefault()
+    if (newPassword !== confirmPassword) { toast.error("Las contraseñas no coinciden"); return }
+    if (newPassword.length < 6) { toast.error("Mínimo 6 caracteres"); return }
+    if (code.length !== 6) return
+    setLoading(true)
+    try {
+      await authService.resetPasswordWithTotp(email, code, newPassword)
+      toast.success("Contraseña actualizada, ya puedes iniciar sesión")
+      onClose()
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Código incorrecto")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose}>
+      <div className="card p-6 w-full max-w-sm animate-slide-up space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2">
+          <KeyRound size={18} style={{ color: "var(--brand)" }} />
+          <h2 className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+            Restablecer contraseña
+          </h2>
+        </div>
+
+        {step === "email" ? (
+          <form onSubmit={handleCheck} className="space-y-3">
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Solo disponible para cuentas con verificación en dos pasos activa.
+            </p>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Usuario</label>
+              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <input
+                  type="text" autoFocus
+                  className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                  style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  value={username}
+                  onChange={e => setUsername(e.target.value.replace(/\s/g, ""))}
+                  disabled={loading}
+                />
+                <span className="px-3 flex items-center text-sm select-none shrink-0"
+                  style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", borderLeft: "1px solid var(--border)" }}>
+                  @aukani.com
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+              <button type="submit" disabled={loading || !username.trim()} className="btn-primary btn-md flex-1">
+                {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+                Continuar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleReset} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                Código de tu app de autenticación
+              </label>
+              <input
+                type="text" inputMode="numeric" maxLength={6} autoFocus
+                className="input text-center tracking-[0.4em] font-semibold"
+                placeholder="000000"
+                value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nueva contraseña</label>
+              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
+                <input
+                  type={showPassword ? "text" : "password"} required minLength={6}
+                  className="flex-1 px-3 py-2 text-sm outline-none min-w-0"
+                  style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                  value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres" disabled={loading}
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)}
+                  className="px-3 flex items-center" style={{ background: "var(--bg-secondary)", borderLeft: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirmar nueva contraseña</label>
+              <input
+                type={showPassword ? "text" : "password"} required
+                className="input"
+                value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Repite la contraseña" disabled={loading}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={onClose} className="btn-outline btn-md flex-1">Cancelar</button>
+              <button type="submit" disabled={loading || code.length !== 6} className="btn-primary btn-md flex-1">
+                {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+                Restablecer
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -13,6 +157,7 @@ export default function LoginPage() {
   const [step, setStep] = useState("credentials") // "credentials" | "2fa"
   const [tempToken, setTempToken] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [showForgotModal, setShowForgotModal] = useState(false)
   const { login } = useAuthStore()
   const { theme, toggle } = useThemeStore()
   const navigate = useNavigate()
@@ -130,6 +275,12 @@ export default function LoginPage() {
                 {loading ? <Loader2 size={16} className="animate-spin" /> : null}
                 {loading ? "Iniciando sesión..." : "Iniciar sesión"}
               </button>
+
+              <button type="button" onClick={() => setShowForgotModal(true)} disabled={loading}
+                className="text-xs w-full text-center transition-colors"
+                style={{ color: "var(--text-muted)" }}>
+                ¿Olvidaste tu contraseña?
+              </button>
             </form>
           ) : (
             <form onSubmit={handleVerify2FA} className="space-y-4">
@@ -177,6 +328,8 @@ export default function LoginPage() {
           Aukani POS v2.0
         </p>
       </div>
+
+      {showForgotModal && <ForgotPasswordModal onClose={() => setShowForgotModal(false)} />}
     </div>
   )
 }
