@@ -10,8 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
-    "electron:build": "vite build && electron-builder",
-    "electron:build:win": "vite build && electron-builder --win",
+    "electron:build": "node scripts/set-default-config.js && vite build && electron-builder",
+    "electron:build:win": "node scripts/set-default-config.js && vite build && electron-builder --win",
     "electron:preview": "electron ."
   },
   "build": {
@@ -20,6 +20,9 @@
     "files": [
       "dist/**/*",
       "electron/**/*"
+    ],
+    "asarUnpack": [
+      "electron/default-config.json"
     ],
     "directories": {
       "output": "release"
@@ -41,7 +44,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "include": "installer.nsh"
     }
   },
   "dependencies": {

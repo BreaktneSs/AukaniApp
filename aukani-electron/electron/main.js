@@ -16,10 +16,26 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json")
 }
 
+// Valores por defecto embebidos al construir el instalador (ver scripts/set-default-config.js).
+// Solo se usan la primerísima vez que arranca la app en un equipo — una vez que existe
+// config.json en userData, ese es el que manda, y este archivo ya no se vuelve a leer.
+function defaultConfigPath() {
+  return path.join(__dirname, "default-config.json")
+}
+
 function readConfig() {
   try {
     if (existsSync(configPath())) return JSON.parse(readFileSync(configPath(), "utf-8"))
   } catch {}
+
+  try {
+    if (existsSync(defaultConfigPath())) {
+      const defaults = JSON.parse(readFileSync(defaultConfigPath(), "utf-8"))
+      writeConfig(defaults)
+      return defaults
+    }
+  } catch {}
+
   return {}
 }
 
