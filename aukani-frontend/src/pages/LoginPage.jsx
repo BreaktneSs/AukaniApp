@@ -174,6 +174,10 @@ export default function LoginPage() {
         setStep("2fa")
         return
       }
+      if (!result.user || !result.token) {
+        toast.error("Respuesta inesperada del servidor. Verifica que sea la URL correcta del backend de Aukani.")
+        return
+      }
       login(result.user, result.token)
       navigate("/pos")
     } catch (err) {
@@ -193,6 +197,10 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { user, token } = await authService.loginVerify2FA(tempToken, code)
+      if (!user || !token) {
+        toast.error("Respuesta inesperada del servidor.")
+        return
+      }
       login(user, token)
       navigate("/pos")
     } catch (err) {
