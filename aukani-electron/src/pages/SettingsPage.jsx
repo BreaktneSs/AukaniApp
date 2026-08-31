@@ -1051,14 +1051,24 @@ function AppUpdateCard() {
   const [checking, setChecking] = useState(false)
 
   useState(() => {
-    window.electronAPI?.getVersion().then(setVersion)
+    window.electronAPI?.getVersion?.()
+      .then(setVersion)
+      .catch(() => setVersion(""))
   })
 
   const handleCheck = async () => {
+    if (!window.electronAPI?.checkForUpdates) {
+      toast.error("Esta función requiere reiniciar la app (build desactualizado)")
+      return
+    }
     setChecking(true)
-    const result = await window.electronAPI.checkForUpdates()
-    if (result.ok) toast.success("Buscando actualizaciones — si hay una nueva, se descarga en segundo plano")
-    else toast.error(result.error || "No se pudo buscar actualizaciones")
+    try {
+      const result = await window.electronAPI.checkForUpdates()
+      if (result.ok) toast.success("Buscando actualizaciones — si hay una nueva, se descarga en segundo plano")
+      else toast.error(result.error || "No se pudo buscar actualizaciones")
+    } catch {
+      toast.error("No se pudo buscar actualizaciones")
+    }
     setChecking(false)
   }
 

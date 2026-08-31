@@ -104,8 +104,11 @@ export async function printReceipt(order, business) {
   const html = buildReceiptHTML(order, business)
   const result = await printerService.print(html)
   if (!result.ok) {
-    console.warn("[Impresora] Error nativo:", result.error)
+    console.warn("[Impresora] Error al imprimir factura (mostrando vista previa):", result.error)
+    await printerService.preview(html)
+    return { ok: true, previewed: true, error: result.error }
   }
+  return result
 }
 
 // ── Abrir cajón de efectivo ───────────────────────────────

@@ -11,6 +11,8 @@ import { accountsService } from "@/services/accounts.service"
 import { paymentMethodsService, categoriesService } from "@/services/catalog.service"
 import { useUiStore } from "@/store/ui.store"
 import NumPad from "@/components/ui/NumPad"
+import { confirm } from "@/components/ui/ConfirmDialog"
+import { printReceipt, openCashDrawer } from "@/services/receipt"
 import {
   Search, X, Plus, Minus, Trash2, ShoppingCart,
   CreditCard, Banknote, Loader2, Package,
@@ -1328,6 +1330,21 @@ export default function POSPage() {
       qc.invalidateQueries({ queryKey: ["products-all"] })
       qc.invalidateQueries({ queryKey: ["shift-active"] })
       qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
+
+      // Cajón: se abre solo si hubo pago en efectivo, sin importar si se imprime factura
+      const hasCash = (data.payments || []).some(p => p.paymentMethod?.name?.toLowerCase().includes("efectivo"))
+      if (hasCash) openCashDrawer()
+
+      // Factura: se pregunta aparte, sin bloquear el resto del flujo de venta
+      confirm({
+        title: "¿Imprimir factura?",
+        message: "¿El cliente quiere la factura impresa de esta venta?",
+        confirmLabel: "Sí, imprimir",
+        cancelLabel: "No",
+        variant: "brand",
+      }).then(wantsReceipt => {
+        if (wantsReceipt) printReceipt({ ...data, user: { name: user?.name } })
+      })
     },
     onError: e => toast.error(e.response?.data?.error || "Error al registrar venta"),
   })
