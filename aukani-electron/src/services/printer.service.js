@@ -25,4 +25,6 @@ export const printerService = {
     const { name } = getConfig()
     return window.electronAPI.printerPrint(html, name || null)
   },
+
+  preview: (html) => window.electronAPI.printerPreview(html),
 }

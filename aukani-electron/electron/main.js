@@ -194,6 +194,26 @@ ipcMain.handle("printer:print", async (_, { html, printerName }) => {
   })
 })
 
+// Vista previa: muestra el HTML tal cual se imprimiría, en una ventana visible —
+// útil para revisar el diseño sin necesitar una impresora física conectada.
+ipcMain.handle("printer:preview", async (_, html) => {
+  const tmp = path.join(tmpdir(), `aukani-preview-${Date.now()}.html`)
+  writeFileSync(tmp, html, "utf-8")
+
+  const previewWin = new BrowserWindow({
+    width: 420,
+    height: 750,
+    title: "Vista previa de impresión",
+    autoHideMenuBar: true,
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  })
+
+  previewWin.loadFile(tmp)
+  previewWin.on("closed", () => { try { unlinkSync(tmp) } catch {} })
+
+  return { ok: true }
+})
+
 // ── Acceso remoto — túnel SSH + SOCKS5 (solo ADMIN, desde la UI) ──
 
 let sshClient = null
@@ -335,6 +355,9 @@ ipcMain.handle("remote:status", () => ({ connected: !!sshClient, info: activeCon
 
 // ── Ventana principal ─────────────────────────────────────
 
+let mainWindow = null
+let allowClose = false // se pone en true solo tras confirmar el cierre desde el renderer
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -351,6 +374,20 @@ function createWindow() {
     },
   })
 
+  mainWindow = win
+
+  // Intercepta el cierre (X, Alt+F4, o menú) para pedir confirmación en el renderer
+  // antes de dejar cerrar de verdad — por seguridad, la confirmación implica logout.
+  win.on("close", (e) => {
+    if (allowClose) return
+    e.preventDefault()
+    win.webContents.send("app:before-close")
+  })
+
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null
+  })
+
   if (isDev) {
     win.loadURL("http://localhost:5173")
     win.webContents.openDevTools()
@@ -358,6 +395,12 @@ function createWindow() {
     win.loadFile(path.join(__dirname, "../dist/index.html"))
   }
 }
+
+// El renderer llama esto tras confirmar (y hacer logout) — recién ahí se deja cerrar.
+ipcMain.on("app:confirm-close", () => {
+  allowClose = true
+  if (mainWindow) mainWindow.close()
+})
 
 app.whenReady().then(createWindow)
 

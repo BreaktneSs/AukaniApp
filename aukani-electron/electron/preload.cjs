@@ -15,10 +15,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   printerList:      ()               => ipcRenderer.invoke("printer:list"),
   printerOpenDrawer:(name)           => ipcRenderer.invoke("printer:open-drawer", name),
   printerPrint:     (html, name)     => ipcRenderer.invoke("printer:print", { html, name }),
+  printerPreview:   (html)           => ipcRenderer.invoke("printer:preview", html),
 
   // ── Acceso remoto (túnel SSH + SOCKS5) ────────────────
   remoteAccessConfig: config.remoteAccess || null,
   remoteConnect:      (cfg)          => ipcRenderer.invoke("remote:connect", cfg),
   remoteDisconnect:   ()             => ipcRenderer.invoke("remote:disconnect"),
   remoteStatus:       ()             => ipcRenderer.invoke("remote:status"),
+
+  // ── Cierre de la app (confirmación + logout obligatorio) ──
+  onBeforeClose: (callback) => ipcRenderer.on("app:before-close", callback),
+  confirmClose:  ()         => ipcRenderer.send("app:confirm-close"),
 })

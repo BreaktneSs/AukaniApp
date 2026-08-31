@@ -7,6 +7,7 @@ import {
   Landmark, Smartphone, Bell, ShieldCheck, CalendarDays, ShoppingBag
 } from "lucide-react"
 import AccessibilityWidget from "@/components/ui/AccessibilityWidget"
+import EmergencyPrintButton from "@/components/ui/EmergencyPrintButton"
 
 const nav = [
   { to: "/pos",          icon: ShoppingCart,  label: "Caja",               roles: ["ADMIN","JEFE","VENDEDOR"] },
@@ -114,6 +115,7 @@ export default function MainLayout() {
             {user?.name?.[0]?.toUpperCase()}
           </div>
           <span className="font-display font-bold text-sm truncate flex-1" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
+          <EmergencyPrintButton />
           <AccessibilityWidget />
         </header>
 

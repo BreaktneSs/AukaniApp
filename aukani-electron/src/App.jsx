@@ -1,11 +1,13 @@
+import { useEffect } from "react"
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom"
 
 const Router = window.electronAPI?.isElectron ? HashRouter : BrowserRouter
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "react-hot-toast"
 import MainLayout from "@/layouts/MainLayout"
-import { ConfirmProvider } from "@/components/ui/ConfirmDialog"
+import { ConfirmProvider, confirm } from "@/components/ui/ConfirmDialog"
 import ProtectedRoute from "@/components/ui/ProtectedRoute"
+import { useAuthStore } from "@/store/auth.store"
 import LoginPage from "@/pages/LoginPage"
 import SetupPage from "@/pages/SetupPage"
 import POSPage from "@/pages/POSPage"
@@ -25,12 +27,35 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 3
 
 const needsSetup = (window.electronAPI?.isElectron ?? false) && !window.electronAPI?.serverUrl
 
+// Al cerrar con la X / Alt+F4: pide confirmación y, si se acepta, cierra sesión
+// antes de dejar salir de verdad — por seguridad en terminales compartidas.
+function CloseConfirmGate() {
+  useEffect(() => {
+    if (!window.electronAPI?.isElectron) return
+    window.electronAPI.onBeforeClose(async () => {
+      const ok = await confirm({
+        title: "¿Cerrar Aukani POS?",
+        message: "Se cerrará tu sesión por seguridad. La próxima persona que abra la app tendrá que iniciar sesión de nuevo.",
+        confirmLabel: "Cerrar sesión y salir",
+        cancelLabel: "Cancelar",
+        variant: "warning",
+      })
+      if (ok) {
+        useAuthStore.getState().logout()
+        window.electronAPI.confirmClose()
+      }
+    })
+  }, [])
+  return null
+}
+
 export default function App() {
   if (needsSetup) return <SetupPage />
 
   return (
     <QueryClientProvider client={qc}>
       <ConfirmProvider>
+      <CloseConfirmGate />
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
