@@ -92,6 +92,15 @@ export const useCartStore = create((set, get) => ({
     saveSales(updated, activeId, nextLocalNum)
   },
 
+  // Renombra una pestaña (nombre de cliente/mesa) — solo el estado local; si tiene
+  // backendId, quien llame también debe sincronizar con el servidor (accountsService.rename)
+  renameSale: (storeId, newName) => {
+    const { sales, activeId, nextLocalNum } = get()
+    const updated = sales.map(s => s.id === storeId ? { ...s, name: newName, label: newName } : s)
+    set({ sales: updated })
+    saveSales(updated, activeId, nextLocalNum)
+  },
+
   // Actualiza los items remotos (desde despachos confirmados) de una cuenta
   updateAccountRemoteItems: (backendId, remoteItems) => {
     const { sales } = get()

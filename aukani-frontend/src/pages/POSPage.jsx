@@ -397,12 +397,37 @@ function PartialPayModal({ items, remoteItems, onConfirm, onClose }) {
 }
 
 // ── SaleTabs ──────────────────────────────────────────────
-function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, flashingId }) {
+function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, onRename, flashingId }) {
   const genericSales = sales.filter(s => s.type !== "account")
   const accounts     = sales.filter(s => s.type === "account")
   const scrollRef    = useRef(null)
   const [canLeft,  setCanLeft]  = useState(false)
   const [canRight, setCanRight] = useState(false)
+  const [menu, setMenu] = useState(null) // { x, y, sale } | null
+  const longPressTimer = useRef(null)
+  const longPressFired = useRef(false)
+
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    document.addEventListener("click", close)
+    document.addEventListener("scroll", close, true)
+    return () => { document.removeEventListener("click", close); document.removeEventListener("scroll", close, true) }
+  }, [menu])
+
+  const openMenuAt = (x, y, sale) => setMenu({ x, y, sale })
+
+  const startLongPress = (e, sale) => {
+    longPressFired.current = false
+    const touch = e.touches?.[0]
+    if (!touch) return
+    const { clientX, clientY } = touch
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true
+      openMenuAt(clientX, clientY, sale)
+    }, 500)
+  }
+  const cancelLongPress = () => { clearTimeout(longPressTimer.current) }
 
   const checkScroll = () => {
     const el = scrollRef.current
@@ -429,7 +454,12 @@ function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, fla
     const isAccount  = sale.type === "account"
     const count = sale.items.reduce((s, i) => s + i.quantity, 0)
     return (
-      <div key={sale.id} onClick={() => onSwitch(sale.id)}
+      <div key={sale.id}
+        onClick={() => { if (longPressFired.current) { longPressFired.current = false; return } onSwitch(sale.id) }}
+        onContextMenu={e => { if (!isAccount) return; e.preventDefault(); openMenuAt(e.clientX, e.clientY, sale) }}
+        onTouchStart={isAccount ? (e => startLongPress(e, sale)) : undefined}
+        onTouchEnd={isAccount ? cancelLongPress : undefined}
+        onTouchMove={isAccount ? cancelLongPress : undefined}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-t-md cursor-pointer shrink-0 select-none border-t border-l border-r -mb-px transition-all duration-150"
         style={{
           background: isActive ? "var(--bg-primary)" : "var(--bg-tertiary)",
@@ -509,6 +539,21 @@ function SaleTabs({ sales, activeId, onSwitch, onNew, onClose, onNewAccount, fla
           <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />
         </button>
       )}
+
+      {/* Menú contextual — clic derecho o mantener presionado en una cuenta */}
+      {menu && (
+        <div
+          className="fixed z-50 rounded-md shadow-lg border py-1 min-w-[150px]"
+          style={{ left: menu.x, top: menu.y, background: "var(--bg-secondary)", borderColor: "var(--border)" }}
+          onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => { onRename(menu.sale); setMenu(null) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:opacity-80"
+            style={{ color: "var(--text-primary)" }}>
+            <Pencil size={13} /> Editar nombre
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -543,6 +588,53 @@ function NewAccountModal({ onConfirm, onClose }) {
             <button type="submit" disabled={!name.trim()} className="btn-md flex-1 text-white font-semibold"
               style={{ background: "var(--info)" }}>
               Abrir cuenta
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal editar nombre de cuenta ─────────────────────────
+function RenameAccountModal({ account, onConfirm, onClose }) {
+  const [name, setName] = useState(account.name || account.label || "")
+  const [saving, setSaving] = useState(false)
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div className="card p-5 w-full max-w-xs animate-slide-up" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: "var(--info-light)" }}>
+            <Pencil size={15} style={{ color: "var(--info)" }} />
+          </div>
+          <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Editar nombre</h3>
+        </div>
+        <form onSubmit={async e => {
+          e.preventDefault()
+          if (!name.trim() || saving) return
+          setSaving(true)
+          await onConfirm(name.trim())
+          setSaving(false)
+          onClose()
+        }} className="space-y-3">
+          <input
+            type="text"
+            autoFocus
+            className="input"
+            placeholder="Nombre del cliente o mesa"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={30}
+            disabled={saving}
+          />
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} disabled={saving} className="btn-outline btn-md flex-1">Cancelar</button>
+            <button type="submit" disabled={!name.trim() || saving} className="btn-md flex-1 text-white font-semibold flex items-center justify-center gap-2"
+              style={{ background: "var(--info)" }}>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+              Guardar
             </button>
           </div>
         </form>
@@ -1007,7 +1099,8 @@ export default function POSPage() {
   const qc = useQueryClient()
 
   const navigate = useNavigate()
-  const { sales, activeId, shiftId, flashingTabId, resetForNewShift, newSale, newAccount, switchSale, closeSale, closeSaleAndNew, clearFlashingTab, addItem, removeItem, updateQuantity, updateItemPrice, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems } = useCartStore()
+  const { sales, activeId, shiftId, flashingTabId, resetForNewShift, newSale, newAccount, switchSale, closeSale, closeSaleAndNew, clearFlashingTab, addItem, removeItem, updateQuantity, updateItemPrice, clearActive, getActive, getTotal, setAccountBackendId, updateAccountRemoteItems, renameSale } = useCartStore()
+  const [renameModal, setRenameModal] = useState(null) // sale | null
   const active = getActive()
   const items = active?.items || []
   const remoteItems = active?.type === "account" ? (active?.remoteItems || []) : []
@@ -1329,6 +1422,7 @@ export default function POSPage() {
         onNew={() => { newSale(); setShowPayment(false); setQuery(""); clearFlashingTab() }}
         onClose={handleTabClose}
         onNewAccount={() => setShowNewAccount(true)}
+        onRename={(sale) => setRenameModal(sale)}
       />
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
@@ -1652,6 +1746,24 @@ export default function POSPage() {
             setShowPayment(false); setQuery("")
           }}
           onClose={() => setShowNewAccount(false)}
+        />
+      )}
+
+      {renameModal && (
+        <RenameAccountModal
+          account={renameModal}
+          onConfirm={async (newName) => {
+            renameSale(renameModal.id, newName)
+            if (renameModal.backendId) {
+              try {
+                await accountsService.rename(renameModal.backendId, newName)
+                qc.invalidateQueries({ queryKey: ["accounts-shift", shift?.id] })
+              } catch {
+                toast.error("Se cambió localmente, pero no se pudo sincronizar con el servidor")
+              }
+            }
+          }}
+          onClose={() => setRenameModal(null)}
         />
       )}
 

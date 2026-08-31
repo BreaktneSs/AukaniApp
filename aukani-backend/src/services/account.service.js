@@ -7,6 +7,13 @@ export const accountService = {
     })
   },
 
+  async rename(id, name) {
+    const account = await prisma.account.findUnique({ where: { id } })
+    if (!account) throw { statusCode: 404, message: "Cuenta no encontrada" }
+    if (account.status !== "OPEN") throw { statusCode: 409, message: "La cuenta ya está cerrada" }
+    return prisma.account.update({ where: { id }, data: { name } })
+  },
+
   async getByShift(shiftId) {
     return prisma.account.findMany({
       where: { shiftId, status: "OPEN" },

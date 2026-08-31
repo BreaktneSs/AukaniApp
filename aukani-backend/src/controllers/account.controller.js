@@ -25,6 +25,22 @@ export const accountController = {
     reply.send(accounts)
   },
 
+  async rename(req, reply) {
+    const accountId = Number(req.params.id)
+    const { name } = req.body
+    if (!name?.trim()) return reply.code(400).send({ error: "name es requerido" })
+    const before = await accountService.getById(accountId)
+    const account = await accountService.rename(accountId, name.trim())
+    await auditService.log({
+      userId: req.user.id, userName: req.user.name, userRole: req.user.role,
+      action: "ACCOUNT_UPDATE", entity: "ACCOUNT",
+      entityId: account.id, entityLabel: account.name,
+      oldValues: { name: before?.name }, newValues: { name: account.name },
+      ip: ip(req),
+    })
+    reply.send(account)
+  },
+
   async addCashierItem(req, reply) {
     const accountId = Number(req.params.id)
     const { productId, price } = req.body
