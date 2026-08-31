@@ -26,4 +26,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ── Cierre de la app (confirmación + logout obligatorio) ──
   onBeforeClose: (callback) => ipcRenderer.on("app:before-close", callback),
   confirmClose:  ()         => ipcRenderer.send("app:confirm-close"),
+
+  // ── Auto-actualización ────────────────────────────────
+  checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
+  getVersion:      () => ipcRenderer.invoke("app:get-version"),
 })

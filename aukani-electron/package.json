@@ -12,6 +12,7 @@
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "electron:build": "node scripts/set-default-config.js && vite build && electron-builder",
     "electron:build:win": "node scripts/set-default-config.js && vite build && electron-builder --win",
+    "electron:release:win": "node scripts/set-default-config.js && vite build && electron-builder --win --publish always",
     "electron:preview": "electron ."
   },
   "build": {
@@ -26,6 +27,11 @@
     ],
     "directories": {
       "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "BreaktneSs",
+      "repo": "AukaniApp"
     },
     "linux": {
       "target": [
@@ -51,6 +57,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.40.0",
     "axios": "^1.7.2",
+    "electron-updater": "^6.8.9",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.383.0",

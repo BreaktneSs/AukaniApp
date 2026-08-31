@@ -1039,6 +1039,41 @@ function ServerTab() {
           {state === "checking" ? "Verificando..." : state === "ok" ? "Guardado — reiniciando..." : "Guardar y reconectar"}
         </button>
       </form>
+
+      <AppUpdateCard />
+    </div>
+  )
+}
+
+// ── Actualizaciones de la app ──────────────────────────────
+function AppUpdateCard() {
+  const [version, setVersion] = useState("")
+  const [checking, setChecking] = useState(false)
+
+  useState(() => {
+    window.electronAPI?.getVersion().then(setVersion)
+  })
+
+  const handleCheck = async () => {
+    setChecking(true)
+    const result = await window.electronAPI.checkForUpdates()
+    if (result.ok) toast.success("Buscando actualizaciones — si hay una nueva, se descarga en segundo plano")
+    else toast.error(result.error || "No se pudo buscar actualizaciones")
+    setChecking(false)
+  }
+
+  return (
+    <div className="card p-4 space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+        Actualizaciones
+      </p>
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        Versión instalada: <span className="font-mono">{version || "…"}</span>
+      </p>
+      <button onClick={handleCheck} disabled={checking} className="btn-outline btn-sm w-full flex items-center justify-center gap-2">
+        {checking ? <Loader2 size={13} className="animate-spin" /> : null}
+        {checking ? "Buscando..." : "Buscar actualizaciones"}
+      </button>
     </div>
   )
 }

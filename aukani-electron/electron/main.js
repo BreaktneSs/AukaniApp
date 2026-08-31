@@ -6,6 +6,7 @@ import { execSync } from "child_process"
 import { tmpdir } from "os"
 import net from "net"
 import { Client as SSHClient } from "ssh2"
+import { autoUpdater } from "electron-updater"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
@@ -402,7 +403,30 @@ ipcMain.on("app:confirm-close", () => {
   if (mainWindow) mainWindow.close()
 })
 
-app.whenReady().then(createWindow)
+// ── Auto-actualización (GitHub Releases) ──────────────────
+// Solo tiene sentido empaquetado — en dev no hay metadata de update y tira error.
+if (!isDev) {
+  autoUpdater.on("error", (err) => {
+    console.error("[AutoUpdater] Error:", err?.message)
+  })
+}
+
+ipcMain.handle("app:check-for-updates", async () => {
+  if (isDev) return { ok: false, error: "No aplica en modo desarrollo" }
+  try {
+    await autoUpdater.checkForUpdatesAndNotify()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle("app:get-version", () => app.getVersion())
+
+app.whenReady().then(() => {
+  createWindow()
+  if (!isDev) autoUpdater.checkForUpdatesAndNotify().catch(() => {})
+})
 
 app.on("window-all-closed", () => {
   disconnectRemoteTunnel().finally(() => {

@@ -1,0 +1,42 @@
+name: Backend release image
+
+# Construye y publica la imagen Docker del backend cada vez que se sube un tag
+# de versión (ej. v1.1.0). Esto SOLO automatiza el build — el deploy real en
+# Asmodeus sigue siendo manual y deliberado (git pull && docker compose up -d
+# --build), a propósito, para no arriesgar un downtime a media venta.
+
+"on":
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extraer nombre de la imagen (todo en minúsculas)
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-backend" >> "$GITHUB_OUTPUT"
+
+      - name: Build y push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./aukani-backend
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.name }}:latest
