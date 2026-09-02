@@ -6,7 +6,8 @@ import { execSync } from "child_process"
 import { tmpdir } from "os"
 import net from "net"
 import { Client as SSHClient } from "ssh2"
-import { autoUpdater } from "electron-updater"
+import electronUpdater from "electron-updater"
+const { autoUpdater } = electronUpdater
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged

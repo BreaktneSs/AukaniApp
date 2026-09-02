@@ -1,6 +1,6 @@
 services:
   api:
-    build: .
+    image: ghcr.io/breaktness/aukaniapp-backend:latest
     container_name: aukani_api
     restart: unless-stopped
     env_file: .env
