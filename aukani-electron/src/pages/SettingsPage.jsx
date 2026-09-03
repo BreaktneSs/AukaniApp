@@ -1064,7 +1064,7 @@ function AppUpdateCard() {
     setChecking(true)
     try {
       const result = await window.electronAPI.checkForUpdates()
-      if (result.ok) toast.success("Buscando actualizaciones — si hay una nueva, se descarga en segundo plano")
+      if (result.ok) toast.success("Buscando actualizaciones — si hay una nueva, va a aparecer un aviso en pantalla")
       else toast.error(result.error || "No se pudo buscar actualizaciones")
     } catch {
       toast.error("No se pudo buscar actualizaciones")

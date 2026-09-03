@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/auth.store"
 import { authService } from "@/services/auth.service"
@@ -304,6 +304,11 @@ export default function LoginPage() {
   const [remoteConnected, setRemoteConnected] = useState(false)
   const { login } = useAuthStore()
   const navigate = useNavigate()
+  const [appVersion, setAppVersion] = useState("")
+
+  useEffect(() => {
+    window.electronAPI?.getVersion?.().then(setAppVersion).catch(() => {})
+  }, [])
 
   // Refleja en el ícono si ya hay un túnel activo (ej. quedó conectado de una sesión anterior)
   useState(() => {
@@ -504,7 +509,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
-          Aukani POS v2.0
+          Aukani POS{appVersion ? ` v${appVersion}` : ""}
         </p>
       </div>
 

@@ -422,16 +422,40 @@ ipcMain.handle("window:is-maximized", () => mainWindow?.isMaximized() ?? false)
 
 // ── Auto-actualización (GitHub Releases) ──────────────────
 // Solo tiene sentido empaquetado — en dev no hay metadata de update y tira error.
+// Chequeo silencioso al abrir la app: si no hay red o no hay nada nuevo, no pasa
+// nada visible (ni error, ni popup). Si SÍ hay una versión nueva, se avisa al
+// renderer para que muestre un modal obligatorio (UpdateModal.jsx, no se puede
+// cerrar) con el progreso de la descarga; al terminar se instala sola, sin pedir
+// otra confirmación.
 if (!isDev) {
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
+
+  autoUpdater.on("update-available", (info) => {
+    mainWindow?.webContents.send("updater:available", { version: info.version })
+  })
+  autoUpdater.on("download-progress", (progress) => {
+    mainWindow?.webContents.send("updater:progress", { percent: Math.round(progress.percent) })
+  })
+  autoUpdater.on("update-downloaded", () => {
+    mainWindow?.webContents.send("updater:downloaded")
+    // Pequeña pausa para que el renderer alcance a mostrar "instalando" antes de
+    // que la app se cierre y se reemplace sola.
+    setTimeout(() => autoUpdater.quitAndInstall(), 2000)
+  })
   autoUpdater.on("error", (err) => {
     console.error("[AutoUpdater] Error:", err?.message)
   })
 }
 
+ipcMain.on("updater:start-download", () => {
+  if (!isDev) autoUpdater.downloadUpdate()
+})
+
 ipcMain.handle("app:check-for-updates", async () => {
   if (isDev) return { ok: false, error: "No aplica en modo desarrollo" }
   try {
-    await autoUpdater.checkForUpdatesAndNotify()
+    await autoUpdater.checkForUpdates()
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -442,7 +466,7 @@ ipcMain.handle("app:get-version", () => app.getVersion())
 
 app.whenReady().then(() => {
   createWindow()
-  if (!isDev) autoUpdater.checkForUpdatesAndNotify().catch(() => {})
+  if (!isDev) autoUpdater.checkForUpdates().catch(() => {}) // silencioso: sin red o sin nada nuevo, no hace nada
 })
 
 app.on("window-all-closed", () => {

@@ -28,8 +28,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   confirmClose:  ()         => ipcRenderer.send("app:confirm-close"),
 
   // ── Auto-actualización ────────────────────────────────
-  checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
-  getVersion:      () => ipcRenderer.invoke("app:get-version"),
+  checkForUpdates:    () => ipcRenderer.invoke("app:check-for-updates"),
+  getVersion:         () => ipcRenderer.invoke("app:get-version"),
+  onUpdateAvailable:  (callback) => ipcRenderer.on("updater:available",  (_e, info) => callback(info)),
+  onUpdateProgress:   (callback) => ipcRenderer.on("updater:progress",   (_e, data) => callback(data)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on("updater:downloaded", callback),
+  startUpdateDownload:() => ipcRenderer.send("updater:start-download"),
 
   // ── Controles de ventana (sin marco nativo — barra propia) ──
   windowMinimize:         () => ipcRenderer.send("window:minimize"),

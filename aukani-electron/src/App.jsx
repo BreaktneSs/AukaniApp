@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "react-hot-toast"
 import MainLayout from "@/layouts/MainLayout"
 import TitleBar from "@/components/ui/TitleBar"
+import UpdateModal from "@/components/ui/UpdateModal"
 import { ConfirmProvider, confirm } from "@/components/ui/ConfirmDialog"
 import ProtectedRoute from "@/components/ui/ProtectedRoute"
 import { useAuthStore } from "@/store/auth.store"
@@ -54,6 +55,7 @@ export default function App() {
   if (needsSetup) return (
     <>
       <TitleBar />
+      <UpdateModal />
       <SetupPage />
     </>
   )
@@ -61,6 +63,7 @@ export default function App() {
   return (
     <>
     <TitleBar />
+    <UpdateModal />
     <QueryClientProvider client={qc}>
       <ConfirmProvider>
       <CloseConfirmGate />
