@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dispatchService } from "@/services/dispatch.service"
+import { getImageUrl } from "@/services/api"
 import { shiftsService } from "@/services/shifts.service"
 import { formatCOP } from "@/utils/currency"
 import {
@@ -74,7 +75,7 @@ function DispatchCard({ dispatch, onConfirm, onCancel, confirming, cancelling })
           <div key={item.id} className="flex items-center gap-3 px-4 py-3">
             {/* Imagen */}
             {item.product?.imageUrl ? (
-              <img src={`/api${item.product.imageUrl}`} alt={item.product.name}
+              <img src={getImageUrl(item.product.imageUrl)} alt={item.product.name}
                 className="w-12 h-12 rounded-lg object-cover shrink-0" />
             ) : (
               <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
@@ -195,7 +196,7 @@ function DeliveryCard({ dispatch, onDeliver, delivering }) {
         {dispatch.items.map(item => (
           <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
             {item.product?.imageUrl ? (
-              <img src={`/api${item.product.imageUrl}`} alt={item.product.name}
+              <img src={getImageUrl(item.product.imageUrl)} alt={item.product.name}
                 className="w-10 h-10 rounded-lg object-cover shrink-0" />
             ) : (
               <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"

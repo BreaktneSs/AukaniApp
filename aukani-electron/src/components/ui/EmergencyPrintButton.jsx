@@ -124,13 +124,13 @@ export default function EmergencyPrintButton() {
       title={hasShift
         ? "Emergencia: imprimir estado de caja, cuentas abiertas, y opcionalmente el inventario"
         : "No hay turno abierto — solo se puede imprimir el inventario"}
-      className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-opacity"
+      className="w-6 h-6 rounded flex items-center justify-center shrink-0 transition-opacity"
       style={{
         background: hasShift ? "var(--danger)" : "var(--border)",
         color: hasShift ? "white" : "var(--text-muted)",
         opacity: loading ? 0.6 : 1,
       }}>
-      {loading ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} fill={hasShift ? "white" : "none"} />}
+      {loading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} fill={hasShift ? "white" : "none"} />}
     </button>
   )
 }

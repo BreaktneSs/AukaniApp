@@ -35,4 +35,14 @@ api.interceptors.response.use(
   }
 )
 
+// Las <img src="..."> no pasan por axios (ni por su baseURL) — el navegador las
+// resuelve contra el documento actual. En electron empaquetado eso es file://, así
+// que una ruta relativa como "/api/uploads/..." termina buscando en el disco local
+// en vez del servidor. Por eso las imágenes necesitan URL absoluta armada con el
+// mismo backendUrl que usa axios; en web el proxy relativo "/api" sigue sirviendo.
+export function getImageUrl(imageUrl) {
+  if (!imageUrl) return null
+  return isElectron ? `${backendUrl}${imageUrl}` : `/api${imageUrl}`
+}
+
 export default api

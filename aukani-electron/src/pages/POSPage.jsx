@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { useCartStore } from "@/store/cart.store"
 import { useAuthStore } from "@/store/auth.store"
 import { productsService } from "@/services/products.service"
+import { getImageUrl } from "@/services/api"
 import { ordersService } from "@/services/orders.service"
 import { shiftsService } from "@/services/shifts.service"
 import { dispatchService } from "@/services/dispatch.service"
@@ -149,7 +150,7 @@ function ProductCard({ product, onAdd }) {
       style={{ border: "1px solid var(--border)" }}>
       {/* Imagen llena todo el cuadro */}
       {product.imageUrl && !err
-        ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name}
+        ? <img src={getImageUrl(product.imageUrl)} onError={() => setErr(true)} alt={product.name}
             className="w-full h-full object-contain"
             style={{ background: "var(--bg-tertiary)" }} />
         : <div className="w-full h-full flex items-center justify-center" style={{ background: "var(--bg-tertiary)" }}>

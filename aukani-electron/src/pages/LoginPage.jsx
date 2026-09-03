@@ -1,9 +1,8 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/auth.store"
-import { useThemeStore } from "@/store/theme.store"
 import { authService } from "@/services/auth.service"
-import { Sun, Moon, Loader2, ShieldCheck, ArrowLeft, KeyRound, Eye, EyeOff, Link2, Unlink } from "lucide-react"
+import { Loader2, ShieldCheck, ArrowLeft, KeyRound, Eye, EyeOff, Link2, Unlink } from "lucide-react"
 import toast from "react-hot-toast"
 import { confirm } from "@/components/ui/ConfirmDialog"
 
@@ -304,7 +303,6 @@ export default function LoginPage() {
   const [showRemoteModal, setShowRemoteModal] = useState(false)
   const [remoteConnected, setRemoteConnected] = useState(false)
   const { login } = useAuthStore()
-  const { theme, toggle } = useThemeStore()
   const navigate = useNavigate()
 
   // Refleja en el ícono si ya hay un túnel activo (ej. quedó conectado de una sesión anterior)
@@ -381,13 +379,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative"
-      style={{ background: "var(--bg-primary)" }}>
-
-      {/* Theme toggle */}
-      <button onClick={toggle} className="absolute top-4 right-4 p-2 rounded-md transition-colors btn-ghost">
-        {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
+    <div className="flex items-center justify-center p-4 relative"
+      style={{ minHeight: "calc(100vh - 32px)", background: "var(--bg-primary)" }}>
 
       {/* Acceso remoto — para conectar el túnel SSH antes de intentar loguear */}
       <button onClick={() => setShowRemoteModal(true)} title="Acceso remoto"

@@ -4,6 +4,7 @@ import autoTable from "jspdf-autotable"
 import * as XLSX from "xlsx"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { inventoryService } from "@/services/inventory.service"
+import { getImageUrl } from "@/services/api"
 import { productsService } from "@/services/products.service"
 import { categoriesService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
@@ -46,7 +47,7 @@ function ProductImg({ imageUrl, name, size = "md" }) {
   const [err, setErr] = useState(false)
   if (!imageUrl || err) return <ImgPlaceholder size={size} />
   const cls = size === "sm" ? "w-9 h-9" : "w-full h-28"
-  return <img src={`/api${imageUrl}`} alt={name} onError={() => setErr(true)} className={`${cls} rounded-lg object-cover`} />
+  return <img src={getImageUrl(imageUrl)} alt={name} onError={() => setErr(true)} className={`${cls} rounded-lg object-cover`} />
 }
 
 // ── ImageUploader ─────────────────────────────────────────
@@ -83,7 +84,7 @@ function ImageUploader({ currentUrl, productId, onUploaded }) {
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => handleFile(e.target.files[0])} />
         {preview ? (
           <div className="relative">
-            <img src={preview.startsWith("/") ? `/api${preview}` : preview} alt="Preview" className="w-full h-28 object-cover" />
+            <img src={preview.startsWith("/") ? getImageUrl(preview) : preview} alt="Preview" className="w-full h-28 object-cover" />
             <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <Camera size={16} className="text-white" /><span className="text-white text-xs font-medium">Cambiar</span>
             </div>

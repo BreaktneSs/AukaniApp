@@ -30,4 +30,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ── Auto-actualización ────────────────────────────────
   checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
   getVersion:      () => ipcRenderer.invoke("app:get-version"),
+
+  // ── Controles de ventana (sin marco nativo — barra propia) ──
+  windowMinimize:         () => ipcRenderer.send("window:minimize"),
+  windowMaximize:         () => ipcRenderer.send("window:maximize"),
+  windowClose:            () => ipcRenderer.send("window:close"),
+  windowIsMaximized:      () => ipcRenderer.invoke("window:is-maximized"),
+  onWindowMaximizedChange:(callback) => ipcRenderer.on("window:maximized-changed", (_e, isMaximized) => callback(isMaximized)),
 })

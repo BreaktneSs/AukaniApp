@@ -37,8 +37,8 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: "var(--bg-primary)" }}>
+    <div className="flex items-center justify-center p-4"
+      style={{ minHeight: "calc(100vh - 32px)", background: "var(--bg-primary)" }}>
       <div className="w-full max-w-sm animate-slide-up">
 
         {/* Logo */}

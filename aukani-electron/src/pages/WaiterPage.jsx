@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { dispatchService } from "@/services/dispatch.service"
 import { accountsService } from "@/services/accounts.service"
 import { productsService } from "@/services/products.service"
+import { getImageUrl } from "@/services/api"
 import { categoriesService, paymentMethodsService } from "@/services/catalog.service"
 import { useAuthStore } from "@/store/auth.store"
 import { useUiStore } from "@/store/ui.store"
@@ -121,7 +122,7 @@ function ProductCard({ product, onAdd }) {
       style={{ borderColor: "var(--border)", minHeight: "160px" }}>
       <div className="w-full flex-1 relative" style={{ minHeight: "100px" }}>
         {product.imageUrl && !err
-          ? <img src={`/api${product.imageUrl}`} onError={() => setErr(true)} alt={product.name}
+          ? <img src={getImageUrl(product.imageUrl)} onError={() => setErr(true)} alt={product.name}
               className="w-full h-full object-cover absolute inset-0" />
           : <div className="w-full h-full flex items-center justify-center absolute inset-0"
               style={{ background: "var(--bg-tertiary)" }}>

@@ -5,6 +5,7 @@ const Router = window.electronAPI?.isElectron ? HashRouter : BrowserRouter
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "react-hot-toast"
 import MainLayout from "@/layouts/MainLayout"
+import TitleBar from "@/components/ui/TitleBar"
 import { ConfirmProvider, confirm } from "@/components/ui/ConfirmDialog"
 import ProtectedRoute from "@/components/ui/ProtectedRoute"
 import { useAuthStore } from "@/store/auth.store"
@@ -50,9 +51,16 @@ function CloseConfirmGate() {
 }
 
 export default function App() {
-  if (needsSetup) return <SetupPage />
+  if (needsSetup) return (
+    <>
+      <TitleBar />
+      <SetupPage />
+    </>
+  )
 
   return (
+    <>
+    <TitleBar />
     <QueryClientProvider client={qc}>
       <ConfirmProvider>
       <CloseConfirmGate />
@@ -82,5 +90,6 @@ export default function App() {
         duration: 3000,
       }} />
     </QueryClientProvider>
+    </>
   )
 }

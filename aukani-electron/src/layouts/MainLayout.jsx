@@ -6,8 +6,6 @@ import {
   LogOut, Boxes, Menu,
   Landmark, Smartphone, Bell, ShieldCheck, CalendarDays, ShoppingBag
 } from "lucide-react"
-import AccessibilityWidget from "@/components/ui/AccessibilityWidget"
-import EmergencyPrintButton from "@/components/ui/EmergencyPrintButton"
 
 const nav = [
   { to: "/pos",          icon: ShoppingCart,  label: "Caja",               roles: ["ADMIN","JEFE","VENDEDOR"] },
@@ -33,7 +31,7 @@ export default function MainLayout() {
   const close = () => setOpen(false)
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+    <div className="flex overflow-hidden" style={{ height: "calc(100vh - 32px)", background: "var(--bg-primary)" }}>
 
       {/* Backdrop con blur — solo visible cuando la sidebar está abierta */}
       {open && (
@@ -115,8 +113,6 @@ export default function MainLayout() {
             {user?.name?.[0]?.toUpperCase()}
           </div>
           <span className="font-display font-bold text-sm truncate flex-1" style={{ color: "var(--text-primary)" }}>{user?.name}</span>
-          <EmergencyPrintButton />
-          <AccessibilityWidget />
         </header>
 
         <main className="flex-1 overflow-auto"><Outlet /></main>

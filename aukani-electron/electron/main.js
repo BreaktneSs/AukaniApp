@@ -369,6 +369,7 @@ function createWindow() {
     title: "Aukani POS",
     icon: path.join(__dirname, "icon.png"),
     autoHideMenuBar: true,
+    frame: false, // sin marco nativo — la barra de título/controles la dibuja el renderer (TitleBar.jsx)
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -377,6 +378,9 @@ function createWindow() {
   })
 
   mainWindow = win
+
+  win.on("maximize",   () => win.webContents.send("window:maximized-changed", true))
+  win.on("unmaximize", () => win.webContents.send("window:maximized-changed", false))
 
   // Intercepta el cierre (X, Alt+F4, o menú) para pedir confirmación en el renderer
   // antes de dejar cerrar de verdad — por seguridad, la confirmación implica logout.
@@ -403,6 +407,18 @@ ipcMain.on("app:confirm-close", () => {
   allowClose = true
   if (mainWindow) mainWindow.close()
 })
+
+// ── Controles de ventana (sin marco nativo) ───────────────
+// El botón de cerrar dispara mainWindow.close(), que sigue disparando el mismo
+// evento "close" interceptado arriba (confirmación + logout) — no se salta esa lógica.
+ipcMain.on("window:minimize", () => mainWindow?.minimize())
+ipcMain.on("window:maximize", () => {
+  if (!mainWindow) return
+  if (mainWindow.isMaximized()) mainWindow.unmaximize()
+  else mainWindow.maximize()
+})
+ipcMain.on("window:close", () => mainWindow?.close())
+ipcMain.handle("window:is-maximized", () => mainWindow?.isMaximized() ?? false)
 
 // ── Auto-actualización (GitHub Releases) ──────────────────
 // Solo tiene sentido empaquetado — en dev no hay metadata de update y tira error.
