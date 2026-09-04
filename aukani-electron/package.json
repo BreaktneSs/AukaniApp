@@ -47,9 +47,11 @@
       "icon": "build/icon.ico"
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "include": "installer.nsh"
     }
   },
   "dependencies": {

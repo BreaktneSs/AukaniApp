@@ -1,22 +1,25 @@
 // Genera electron/default-config.json antes de empaquetar. Este archivo se deja
-// desempacado del .asar (ver "asarUnpack" en package.json) para que quede como
-// archivo real en disco (resources/app.asar.unpacked/electron/default-config.json),
-// legible por electron/main.js (readConfig -> defaultConfigPath) sin tener que abrir
-// el .asar.
+// desempacado del .asar (ver "asarUnpack" en package.json) precisamente para que el
+// instalador NSIS (ver installer.nsh) pueda sobrescribirlo con lo que el admin
+// escriba en la página custom del wizard — así queda como archivo real en disco,
+// no sellado dentro del .asar.
 //
-// El instalador es oneClick (sin wizard, sin páginas custom) para que las
-// actualizaciones automáticas de electron-updater sean realmente silenciosas — un
-// instalador "assisted" (oneClick:false) vuelve a mostrar su UI completa cada vez
-// que se reinstala, incluida cualquier página propia, que es justo lo que pasaba
-// antes. Por eso toda esta configuración es solo por variable de entorno (para
-// builds ya armados con los datos del cliente) o, si no se define nada acá, la app
-// la pide sola en su primer arranque (SetupPage.jsx) y desde Configuración.
+// Las variables de entorno son un atajo opcional para pre-llenar un valor por defecto
+// sin depender de la página del instalador (útil para builds automatizados/CI o para
+// dejar todo precargado de una — el instalador sigue preguntando igual, y si el admin
+// no escribe nada ahí, queda lo que ya traía este archivo):
 //
 //   AUKANI_SERVER_URL         → URL del backend (config.json → serverUrl)
 //   AUKANI_REMOTE_HOST        → host SSH por defecto para Acceso remoto
 //   AUKANI_REMOTE_PORT        → puerto SSH por defecto (default 22 si se da host sin puerto)
 //   AUKANI_IGNORE_CERT_ERRORS → "true" para aceptar certificados HTTPS autofirmados
 //                                (redes locales con proxy propio sin CA pública)
+//
+// El instalador es "assisted" (oneClick:false, con wizard y página propia) — esto es
+// compatible con actualizaciones automáticas silenciosas: NSIS salta TODAS sus
+// páginas (incluida la nuestra) cuando corre en modo /S, que es como electron-updater
+// ejecuta el instalador al actualizar (ver quitAndInstall(true, true) en main.js). La
+// página del wizard solo se ve en una instalación manual real, nunca en un auto-update.
 import { writeFileSync } from "fs"
 import path from "path"
 import { fileURLToPath } from "url"

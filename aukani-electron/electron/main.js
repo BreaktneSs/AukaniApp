@@ -61,14 +61,21 @@ ipcMain.handle("config:set-ignore-cert-errors", (_, enabled) => {
   writeConfig(cfg)
 })
 
-// Certificados HTTPS autofirmados (redes locales sin CA pública) — el switch de
-// Chromium debe aplicarse ANTES de que la app esté lista, así que se lee la config
-// acá mismo en vez de esperar al flujo normal por IPC. Un cambio hecho en caliente
-// desde Configuración solo toma efecto tras reiniciar la app (setIgnoreCertErrors
-// ya pide relanzar, igual que setServerUrl).
-if (readConfig().ignoreCertErrors) {
-  app.commandLine.appendSwitch("ignore-certificate-errors")
-}
+// Certificados HTTPS autofirmados (redes locales sin CA pública). El switch de
+// Chromium (appendSwitch("ignore-certificate-errors")) no es confiable para esto —
+// según la versión no cubre peticiones fetch()/XHR hechas desde el renderer (que es
+// justo lo que usan SetupPage.jsx y axios), así que el mecanismo real es interceptar
+// el evento "certificate-error" directamente — el mismo que ya se probó y funcionó
+// en producción para este caso. Se lee la config en cada evento (no una sola vez al
+// arrancar) para no depender de en qué momento exacto se haya escrito config.json.
+app.on("certificate-error", (event, webContents, url, error, certificate, callback) => {
+  if (readConfig().ignoreCertErrors) {
+    event.preventDefault()
+    callback(true)
+  } else {
+    callback(false)
+  }
+})
 
 ipcMain.on("config:relaunch", () => {
   app.relaunch()
@@ -456,7 +463,11 @@ if (!isDev) {
     mainWindow?.webContents.send("updater:downloaded")
     // Pequeña pausa para que el renderer alcance a mostrar "instalando" antes de
     // que la app se cierre y se reemplace sola.
-    setTimeout(() => autoUpdater.quitAndInstall(), 2000)
+    // isSilent=true, isForceRunAfter=true — sin esto, quitAndInstall() corre el
+    // instalador en modo NORMAL (interactivo), reabriendo el wizard completo con la
+    // página de configuración incluida, como si fuera una instalación nueva. Con
+    // esto sí queda silencioso de verdad: cierra, instala y reabre solo, sin UI.
+    setTimeout(() => autoUpdater.quitAndInstall(true, true), 2000)
   })
   autoUpdater.on("error", (err) => {
     console.error("[AutoUpdater] Error:", err?.message)
