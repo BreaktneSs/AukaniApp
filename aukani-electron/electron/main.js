@@ -55,6 +55,21 @@ ipcMain.handle("config:set-server-url", (_, url) => {
   writeConfig(cfg)
 })
 
+ipcMain.handle("config:set-ignore-cert-errors", (_, enabled) => {
+  const cfg = readConfig()
+  cfg.ignoreCertErrors = !!enabled
+  writeConfig(cfg)
+})
+
+// Certificados HTTPS autofirmados (redes locales sin CA pública) — el switch de
+// Chromium debe aplicarse ANTES de que la app esté lista, así que se lee la config
+// acá mismo en vez de esperar al flujo normal por IPC. Un cambio hecho en caliente
+// desde Configuración solo toma efecto tras reiniciar la app (setIgnoreCertErrors
+// ya pide relanzar, igual que setServerUrl).
+if (readConfig().ignoreCertErrors) {
+  app.commandLine.appendSwitch("ignore-certificate-errors")
+}
+
 ipcMain.on("config:relaunch", () => {
   app.relaunch()
   app.exit(0)

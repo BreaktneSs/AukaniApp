@@ -30,11 +30,17 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 3
 const needsSetup = (window.electronAPI?.isElectron ?? false) && !window.electronAPI?.serverUrl
 
 // Al cerrar con la X / Alt+F4: pide confirmación y, si se acepta, cierra sesión
-// antes de dejar salir de verdad — por seguridad en terminales compartidas.
+// antes de dejar salir de verdad — por seguridad en terminales compartidas. Si no
+// hay sesión iniciada (ej. está en la pantalla de login) no hay nada que proteger,
+// así que se cierra directo sin preguntar nada.
 function CloseConfirmGate() {
   useEffect(() => {
     if (!window.electronAPI?.isElectron) return
     window.electronAPI.onBeforeClose(async () => {
+      if (!useAuthStore.getState().token) {
+        window.electronAPI.confirmClose()
+        return
+      }
       const ok = await confirm({
         title: "¿Cerrar Aukani POS?",
         message: "Se cerrará tu sesión por seguridad. La próxima persona que abra la app tendrá que iniciar sesión de nuevo.",
@@ -56,7 +62,10 @@ export default function App() {
     <>
       <TitleBar />
       <UpdateModal />
-      <SetupPage />
+      <ConfirmProvider>
+        <CloseConfirmGate />
+        <SetupPage />
+      </ConfirmProvider>
     </>
   )
 

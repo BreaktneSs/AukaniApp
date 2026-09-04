@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setServerUrl: (url) => ipcRenderer.invoke("config:set-server-url", url),
   relaunch:     () => ipcRenderer.send("config:relaunch"),
 
+  // ── Certificados HTTPS autofirmados (redes locales) ────
+  ignoreCertErrors:    !!config.ignoreCertErrors,
+  setIgnoreCertErrors: (enabled) => ipcRenderer.invoke("config:set-ignore-cert-errors", enabled),
+
   // ── Impresora (nativo — sin agente externo) ───────────
   printerList:      ()               => ipcRenderer.invoke("printer:list"),
   printerOpenDrawer:(name)           => ipcRenderer.invoke("printer:open-drawer", name),

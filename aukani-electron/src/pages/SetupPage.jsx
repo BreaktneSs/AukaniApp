@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Loader2, ServerCrash, CheckCircle2 } from "lucide-react"
 import toast from "react-hot-toast"
+import Checkbox from "@/components/ui/Checkbox"
 
 const FINGERPRINT = "Aukani POS API running"
 
@@ -20,6 +21,19 @@ async function verifyServer(url) {
 export default function SetupPage() {
   const [url, setUrl] = useState("http://")
   const [state, setState] = useState("idle") // idle | checking | ok | error
+  const [ignoreCert, setIgnoreCert] = useState(!!window.electronAPI?.ignoreCertErrors)
+  const [appVersion, setAppVersion] = useState("")
+
+  useEffect(() => {
+    window.electronAPI?.getVersion?.().then(setAppVersion).catch(() => {})
+  }, [])
+
+  const handleIgnoreCertToggle = async () => {
+    const next = !ignoreCert
+    await window.electronAPI.setIgnoreCertErrors(next)
+    setIgnoreCert(next)
+    window.electronAPI.relaunch()
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -86,12 +100,22 @@ export default function SetupPage() {
 
             {/* Feedback de verificación */}
             {state === "error" && (
-              <div className="flex items-start gap-2 rounded-lg px-3 py-2.5"
-                style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}>
-                <ServerCrash size={15} style={{ color: "var(--danger)", marginTop: 1, shrink: 0 }} />
-                <p className="text-xs" style={{ color: "var(--danger)" }}>
-                  No se pudo conectar. Verifica que la URL sea correcta y que el servidor esté encendido.
-                </p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2 rounded-lg px-3 py-2.5"
+                  style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}>
+                  <ServerCrash size={15} style={{ color: "var(--danger)", marginTop: 1, shrink: 0 }} />
+                  <p className="text-xs" style={{ color: "var(--danger)" }}>
+                    No se pudo conectar. Verifica que la URL sea correcta y que el servidor esté encendido.
+                  </p>
+                </div>
+                <div className="rounded-lg px-3 py-2.5" style={{ background: "var(--bg-tertiary)" }}>
+                  <Checkbox
+                    checked={ignoreCert}
+                    onChange={handleIgnoreCertToggle}
+                    label="¿El servidor usa un certificado HTTPS autofirmado?"
+                    sublabel="Actívalo y la app se reinicia sola para aceptarlo — solo para redes locales de confianza."
+                  />
+                </div>
               </div>
             )}
 
@@ -117,7 +141,7 @@ export default function SetupPage() {
         </div>
 
         <p className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
-          Aukani POS v2.0
+          Aukani POS{appVersion ? ` v${appVersion}` : ""}
         </p>
       </div>
     </div>

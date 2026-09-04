@@ -1040,7 +1040,44 @@ function ServerTab() {
         </button>
       </form>
 
+      <CertBypassCard />
       <AppUpdateCard />
+    </div>
+  )
+}
+
+// ── Certificados HTTPS autofirmados (redes locales) ────────
+function CertBypassCard() {
+  const [enabled, setEnabled] = useState(!!window.electronAPI?.ignoreCertErrors)
+  const [saving, setSaving] = useState(false)
+
+  const handleToggle = async () => {
+    if (saving) return
+    const next = !enabled
+    setSaving(true)
+    try {
+      await window.electronAPI.setIgnoreCertErrors(next)
+      setEnabled(next)
+      toast.success("Guardado — reiniciando...")
+      setTimeout(() => window.electronAPI.relaunch(), 800)
+    } catch {
+      toast.error("No se pudo guardar")
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div className="card p-4 space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+        Certificados
+      </p>
+      <Checkbox
+        checked={enabled}
+        onChange={handleToggle}
+        label="Aceptar certificados HTTPS autofirmados"
+        sublabel="Solo para redes locales con proxy propio, sin certificado de una autoridad pública. Requiere reiniciar la app."
+      />
+      {saving && <p className="text-xs" style={{ color: "var(--text-muted)" }}>Guardando...</p>}
     </div>
   )
 }
