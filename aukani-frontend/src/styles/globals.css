@@ -99,6 +99,10 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* Scroll invisible pero funcional (grid de productos, carrito, etc.) + más fluido */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
 }
 
 @layer components {

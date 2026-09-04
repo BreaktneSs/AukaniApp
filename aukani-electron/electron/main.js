@@ -391,7 +391,7 @@ function createWindow() {
     title: "Aukani POS",
     icon: path.join(__dirname, "icon.png"),
     autoHideMenuBar: true,
-    frame: false, // sin marco nativo — la barra de título/controles la dibuja el renderer (TitleBar.jsx)
+    frame: false, // sin marco nativo — la barra de título/controles la dibuja el renderer (TitleBar.jsx / MainLayout.jsx)
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

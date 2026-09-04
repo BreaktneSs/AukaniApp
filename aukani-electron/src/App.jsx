@@ -71,14 +71,15 @@ export default function App() {
 
   return (
     <>
-    <TitleBar />
     <UpdateModal />
     <QueryClientProvider client={qc}>
       <ConfirmProvider>
       <CloseConfirmGate />
       <Router>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          {/* Sin sesión: la barra de título la pone esta ruta directamente — una vez
+              logueado, MainLayout dibuja su propia barra unificada y deja de usar esta. */}
+          <Route path="/login" element={<><TitleBar /><LoginPage /></>} />
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/pos" replace />} />
             <Route path="/pos"       element={<ProtectedRoute roles={["ADMIN","JEFE","VENDEDOR"]}><POSPage /></ProtectedRoute>} />

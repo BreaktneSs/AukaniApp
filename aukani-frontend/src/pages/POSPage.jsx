@@ -1532,7 +1532,7 @@ export default function POSPage() {
           )}
 
           {/* Grid productos */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto no-scrollbar">
             {isFetching ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 size={20} className="animate-spin" style={{ color: "var(--text-muted)" }} />
@@ -1556,7 +1556,7 @@ export default function POSPage() {
       <div className="w-full md:w-80 lg:w-96 flex flex-col border-t md:border-t-0 md:border-l"
         style={{ background: "var(--bg-secondary)", borderColor: "var(--border)" }}>
 
-          <div className="flex-1 overflow-y-auto px-4 pt-2">
+          <div className="flex-1 overflow-y-auto no-scrollbar px-4 pt-2">
             {items.length === 0 && remoteItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 py-12">
                 <ShoppingCart size={28} style={{ color: "var(--bg-tertiary)" }} />
