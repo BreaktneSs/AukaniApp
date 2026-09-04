@@ -239,9 +239,11 @@ export const shiftService = {
     return closedShift
   },
 
-  async getAll({ page = 1, limit = 20, userId } = {}) {
+  async getAll({ page = 1, limit = 20, userId, status } = {}) {
     const skip = (page - 1) * limit
-    const where = userId ? { userId } : {}
+    const where = {}
+    if (userId) where.userId = userId
+    if (status === "OPEN" || status === "CLOSED") where.status = status
 
     const [shifts, total] = await Promise.all([
       prisma.shift.findMany({

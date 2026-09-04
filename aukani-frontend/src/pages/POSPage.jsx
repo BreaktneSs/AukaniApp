@@ -1130,8 +1130,13 @@ export default function POSPage() {
     if (shift?.id) {
       // Solo sincronizar el shiftId en el store, sin tocar las ventas
       useCartStore.setState({ shiftId: shift.id })
+    } else if (shift === null) {
+      // El turno se cerró (posiblemente desde otro dispositivo, ej. un admin
+      // forzando el cierre desde Control de caja) — limpiar para no dejar un
+      // shiftId apuntando a un turno ya cerrado.
+      useCartStore.setState({ shiftId: null })
     }
-  }, [shift?.id])
+  }, [shift])
 
   // Cuentas abiertas del turno — polling cada 10s para actualizar remoteItems
   const { data: backendAccounts = [] } = useQuery({

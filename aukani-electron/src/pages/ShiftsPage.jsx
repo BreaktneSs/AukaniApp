@@ -670,11 +670,15 @@ export default function ShiftsPage() {
 
   const { data: historyData, isLoading: loadingHistory } = useQuery({
     queryKey: ["shifts-history", page],
-    queryFn: () => shiftsService.getAll({ page, limit: 15 }),
+    // El filtro por status va al backend (antes se pedían 15 turnos sin filtrar y se
+    // descartaban los OPEN acá — con eso casi nunca se completaba una página de 15
+    // cerrados, así que "history.length < 15" quedaba en true por siempre y el botón
+    // "→" se veía deshabilitado aunque sí hubiera más turnos cerrados después).
+    queryFn: () => shiftsService.getAll({ page, limit: 15, status: "CLOSED" }),
     enabled: activeTab === "Historial",
   })
 
-  const history = (historyData?.shifts || []).filter(s => s.status === "CLOSED")
+  const history = historyData?.shifts || []
   const totalHistory = historyData?.total || 0
 
   const totalActive = activeShifts.reduce((s, sh) =>

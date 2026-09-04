@@ -55,8 +55,8 @@ export const shiftController = {
   },
 
   async getAll(req, reply) {
-    const { page, limit, userId } = req.query
-    return reply.send(await shiftService.getAll({ page: Number(page) || 1, limit: Number(limit) || 20, userId: userId ? Number(userId) : undefined }))
+    const { page, limit, userId, status } = req.query
+    return reply.send(await shiftService.getAll({ page: Number(page) || 1, limit: Number(limit) || 20, userId: userId ? Number(userId) : undefined, status }))
   },
 
   async getById(req, reply) {
