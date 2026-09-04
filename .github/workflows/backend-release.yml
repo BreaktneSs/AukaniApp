@@ -1,14 +1,21 @@
 name: Backend release image
 
 # Construye y publica la imagen Docker del backend cada vez que se sube un tag
-# de versión (ej. v1.1.0). Esto SOLO automatiza el build — el deploy real en
-# Asmodeus sigue siendo manual y deliberado (git pull && docker compose up -d
-# --build), a propósito, para no arriesgar un downtime a media venta.
+# de versión con el prefijo "backend-" (ej. backend-v1.1.0). Esto SOLO automatiza
+# el build — el deploy real en Asmodeus sigue siendo manual y deliberado
+# (docker compose pull && up -d), a propósito, para no arriesgar un downtime a
+# media venta.
+#
+# El prefijo "backend-" es necesario porque el cliente Electron también publica
+# tags "vX.Y.Z" (vía electron-builder, al hacer un release) — ambos componentes
+# versionan independiente pero comparten el mismo namespace de tags de git, así
+# que sin el prefijo un release del cliente dispararía este workflow por error
+# (o chocaría con un tag que el cliente ya usó, como pasó con v1.1.0).
 
 "on":
   push:
     tags:
-      - "v*"
+      - "backend-v*"
 
 permissions:
   contents: read
@@ -32,11 +39,15 @@ jobs:
         id: image
         run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-backend" >> "$GITHUB_OUTPUT"
 
+      - name: Extraer versión (quita el prefijo "backend-" del tag)
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#backend-}" >> "$GITHUB_OUTPUT"
+
       - name: Build y push
         uses: docker/build-push-action@v6
         with:
           context: ./aukani-backend
           push: true
           tags: |
-            ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.name }}:${{ steps.version.outputs.value }}
             ${{ steps.image.outputs.name }}:latest
