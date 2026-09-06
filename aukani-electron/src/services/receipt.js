@@ -49,7 +49,7 @@ export function buildReceiptHTML(order, business) {
 <title>Factura #${order.id}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Courier New',monospace;font-size:12px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff}
+  body{font-family:'Courier New',monospace;font-weight:bold;font-size:12px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff}
   .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}
   .lg{font-size:15px}.xl{font-size:19px}
   hr{border:none;border-top:1px dashed #000;margin:4px 0}
@@ -180,7 +180,7 @@ export function buildEmergencyReceiptHTML({ shift, cashAvailable, openAccounts, 
 <title>Colilla de emergencia</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Courier New',monospace;font-size:12px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff}
+  body{font-family:'Courier New',monospace;font-weight:bold;font-size:12px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff}
   .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}
   .lg{font-size:15px}.xl{font-size:19px}
   hr{border:none;border-top:1px dashed #000;margin:4px 0}
@@ -273,7 +273,7 @@ export function buildInventoryReceiptHTML({ products, printedAt }, business) {
 <title>Inventario y precios</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Courier New',monospace;font-size:12px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff}
+  body{font-family:'Courier New',monospace;font-weight:bold;font-size:12px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff}
   .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}
   .lg{font-size:15px}.xl{font-size:19px}
   hr{border:none;border-top:1px dashed #000;margin:4px 0}

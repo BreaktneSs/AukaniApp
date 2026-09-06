@@ -4,9 +4,10 @@ import { ordersService } from "@/services/orders.service"
 import { paymentMethodsService } from "@/services/catalog.service"
 import { useUiStore } from "@/store/ui.store"
 import NumPad from "@/components/ui/NumPad"
-import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus, AlertTriangle, User } from "lucide-react"
+import { Eye, XCircle, RotateCcw, Loader2, ChevronLeft, ChevronRight, Minus, Plus, AlertTriangle, User, Printer } from "lucide-react"
 import { confirm } from "@/components/ui/ConfirmDialog"
 import { formatCOP } from "@/utils/currency"
+import { printReceipt } from "@/services/receipt"
 import toast from "react-hot-toast"
 
 const STATUS = {
@@ -17,7 +18,7 @@ const STATUS = {
 }
 
 // ── Detail modal ──────────────────────────────────────────────────────────────
-function OrderDetail({ order, onClose, onRefund }) {
+function OrderDetail({ order, onClose, onRefund, onPrint, printing }) {
   const canRefund = order.status === "COMPLETED" || order.status === "PARTIAL_REFUND"
   const hasRefunds = order.items?.some(i => i.refundedQty > 0)
 
@@ -151,6 +152,11 @@ function OrderDetail({ order, onClose, onRefund }) {
         </div>
 
         <div className="flex gap-2 mt-4">
+          <button onClick={() => onPrint(order)} disabled={printing}
+            className="btn-outline btn-md flex-1 flex items-center justify-center gap-2">
+            {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+            Imprimir
+          </button>
           {canRefund && (
             <button onClick={() => { onClose(); onRefund(order) }}
               className="btn-outline btn-md flex-1 flex items-center justify-center gap-2"
@@ -395,7 +401,25 @@ export default function SalesPage() {
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const [refundOrder, setRefundOrder] = useState(null)
+  const [printingId, setPrintingId] = useState(null)
   const qc = useQueryClient()
+
+  // Reimprimir la factura de una venta ya realizada — trae los datos completos
+  // (la fila de la tabla no trae items/pagos) y reusa el mismo printReceipt del
+  // POS, con la misma resiliencia de vista previa si no hay impresora.
+  const handlePrint = async (orderSummary) => {
+    setPrintingId(orderSummary.id)
+    try {
+      const order = orderSummary.items ? orderSummary : await ordersService.getById(orderSummary.id)
+      const result = await printReceipt(order)
+      if (result.previewed) toast("No se detectó impresora — mostrando vista previa", { icon: "🖨️" })
+      else if (result.ok) toast.success("Factura impresa")
+      else toast.error("No se pudo imprimir: " + (result.error || "error desconocido"))
+    } catch {
+      toast.error("No se pudo obtener la venta")
+    }
+    setPrintingId(null)
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["orders", page],
@@ -496,6 +520,13 @@ export default function SalesPage() {
                             title="Ver detalle">
                             <Eye size={13} />
                           </button>
+                          <button
+                            onClick={() => handlePrint(o)}
+                            disabled={printingId === o.id}
+                            className="btn-ghost w-7 h-7 rounded flex items-center justify-center"
+                            title="Imprimir factura">
+                            {printingId === o.id ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+                          </button>
                           {canRefund && (
                             <button
                               onClick={() => openRefundFor(o)}
@@ -549,6 +580,8 @@ export default function SalesPage() {
           order={detail}
           onClose={() => setDetail(null)}
           onRefund={order => { setDetail(null); openRefundFor(order) }}
+          onPrint={handlePrint}
+          printing={printingId === detail.id}
         />
       )}
 
