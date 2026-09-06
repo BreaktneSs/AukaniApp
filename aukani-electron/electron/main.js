@@ -192,7 +192,12 @@ ipcMain.handle("printer:open-drawer", (_, printerName) => {
   }
 })
 
-ipcMain.handle("printer:print", async (_, { html, printerName }) => {
+// El payload real que manda preload.cjs es { html, name } (ver printerPrint ahí) —
+// este handler destructuraba "printerName", una clave que nunca existía en el
+// objeto, así que siempre imprimía en la impresora predeterminada del sistema en
+// vez de la seleccionada en Configuración (sin tirar error, porque el print sí
+// "funcionaba" — solo que en el dispositivo equivocado).
+ipcMain.handle("printer:print", async (_, { html, name: printerName }) => {
   const tmp = path.join(tmpdir(), `aukani-receipt-${Date.now()}.html`)
   writeFileSync(tmp, html, "utf-8")
 
