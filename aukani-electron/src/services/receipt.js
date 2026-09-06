@@ -60,7 +60,13 @@ export function buildReceiptHTML(order, business) {
   .change-row td{font-size:12px}
   .footer{margin-top:6px;font-size:10px}
   @media print{
-    body{width:72mm}
+    /* margin:0 (sin "auto") — el "auto" centra el bloque de 72mm calculando el
+       ancho total de página que reporta el driver; en impresoras térmicas GDI
+       baratas ese cálculo puede no coincidir exacto con lo que Chromium asume,
+       corriendo el contenido fuera del área imprimible del cabezal y saliendo en
+       blanco (papel avanza, pero el texto queda fuera de rango). Sin "auto" queda
+       pegado al borde izquierdo, que es exactamente el borde real del rollo. */
+    body{width:72mm;margin:0}
     @page{margin:0;size:80mm auto}
   }
 </style>
@@ -184,7 +190,13 @@ export function buildEmergencyReceiptHTML({ shift, cashAvailable, openAccounts, 
   .total-row td{border-top:1px solid #000;font-weight:bold;padding-top:4px;font-size:13px}
   .warn{border:1px solid #000;padding:3px;margin:4px 0}
   @media print{
-    body{width:72mm}
+    /* margin:0 (sin "auto") — el "auto" centra el bloque de 72mm calculando el
+       ancho total de página que reporta el driver; en impresoras térmicas GDI
+       baratas ese cálculo puede no coincidir exacto con lo que Chromium asume,
+       corriendo el contenido fuera del área imprimible del cabezal y saliendo en
+       blanco (papel avanza, pero el texto queda fuera de rango). Sin "auto" queda
+       pegado al borde izquierdo, que es exactamente el borde real del rollo. */
+    body{width:72mm;margin:0}
     @page{margin:0;size:80mm auto}
   }
 </style>
@@ -270,7 +282,13 @@ export function buildInventoryReceiptHTML({ products, printedAt }, business) {
   .leader .dots{flex:1;border-bottom:1px dotted #000;margin-bottom:2px}
   .leader .price{white-space:nowrap}
   @media print{
-    body{width:72mm}
+    /* margin:0 (sin "auto") — el "auto" centra el bloque de 72mm calculando el
+       ancho total de página que reporta el driver; en impresoras térmicas GDI
+       baratas ese cálculo puede no coincidir exacto con lo que Chromium asume,
+       corriendo el contenido fuera del área imprimible del cabezal y saliendo en
+       blanco (papel avanza, pero el texto queda fuera de rango). Sin "auto" queda
+       pegado al borde izquierdo, que es exactamente el borde real del rollo. */
+    body{width:72mm;margin:0}
     @page{margin:0;size:80mm auto}
   }
 </style>
