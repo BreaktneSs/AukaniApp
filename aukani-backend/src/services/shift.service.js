@@ -207,15 +207,15 @@ export const shiftService = {
       select: { id: true },
     })
 
-    const [closedShift] = await prisma.$transaction([
-      prisma.shift.update({
-        where: { id: shiftId },
-        data: { status: "CLOSED", closingCash, expectedCash, difference, notes, closedAt: new Date() },
-        include: {
-          shiftPayments: { include: { paymentMethod: true } },
-          user: { select: { id: true, name: true } },
-        },
-      }),
+    // El shift.update con include:shiftPayments va AL FINAL del arreglo — Prisma
+    // ejecuta cada operación de $transaction en orden dentro de la misma
+    // transacción, así que si el update+include corriera primero (como estaba
+    // antes), su "include" vería la tabla shiftPayment tal como estaba ANTES de
+    // los upsert de más abajo, y devolvería el arreglo vacío en la respuesta
+    // inmediata (aunque los upsert sí aplicaran bien en la base). No afecta a la
+    // UI hoy — nadie usa esa respuesta directa, todos vuelven a pedir los datos —
+    // pero deja la respuesta correcta desde ya, por si algo la llega a necesitar.
+    const results = await prisma.$transaction([
       prisma.subShift.updateMany({
         where: { parentShiftId: shiftId, status: "OPEN" },
         data: { status: "CLOSED", closedAt: new Date() },
@@ -234,9 +234,17 @@ export const shiftService = {
           create: sp,
         })
       ),
+      prisma.shift.update({
+        where: { id: shiftId },
+        data: { status: "CLOSED", closingCash, expectedCash, difference, notes, closedAt: new Date() },
+        include: {
+          shiftPayments: { include: { paymentMethod: true } },
+          user: { select: { id: true, name: true } },
+        },
+      }),
     ])
 
-    return closedShift
+    return results[results.length - 1]
   },
 
   async getAll({ page = 1, limit = 20, userId, status } = {}) {
