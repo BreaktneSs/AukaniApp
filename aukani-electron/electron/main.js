@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, session } from "electron"
 import { fileURLToPath } from "url"
 import path from "path"
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs"
-import { execSync } from "child_process"
+import { execSync, execFileSync } from "child_process"
 import { tmpdir } from "os"
 import net from "net"
 import { Client as SSHClient } from "ssh2"
@@ -165,11 +165,18 @@ function openDrawerNative(printerName) {
       try { unlinkSync(tmp) } catch {}
     }
   } else {
-    // Linux/Mac: escribir ESC/POS directo al dispositivo USB
-    const candidates = ["/dev/usb/lp0", "/dev/usb/lp1", "/dev/ttyUSB0"]
-    const dev = candidates.find(d => existsSync(d))
-    if (!dev) throw new Error("No se encontró dispositivo de impresora en /dev/usb/lp*")
-    writeFileSync(dev, Buffer.from(DRAWER_BYTES))
+    // Linux/Mac: mandar los bytes ESC/POS en crudo por CUPS ("-o raw" salta los
+    // filtros del driver) a la impresora seleccionada — o a la predeterminada del
+    // sistema si no hay ninguna elegida. A diferencia de escribir directo a
+    // /dev/usb/lp0, respeta la impresora de Configuración, funciona con impresoras
+    // de red, y no requiere que el usuario esté en el grupo "lp".
+    const args = printerName ? ["-d", printerName, "-o", "raw"] : ["-o", "raw"]
+    try {
+      execFileSync("lp", args, { input: Buffer.from(DRAWER_BYTES), timeout: 5000 })
+    } catch (err) {
+      if (err.code === "ENOENT") throw new Error("No se encontró el comando 'lp' — instala CUPS")
+      throw new Error(err.stderr?.toString().trim() || err.message)
+    }
   }
 }
 
@@ -454,6 +461,21 @@ ipcMain.handle("window:is-maximized", () => mainWindow?.isMaximized() ?? false)
 // renderer para que muestre un modal obligatorio (UpdateModal.jsx, no se puede
 // cerrar) con el progreso de la descarga; al terminar se instala sola, sin pedir
 // otra confirmación.
+function describeUpdaterError(err) {
+  const msg = err?.message || String(err)
+  // AppImage: el updater borra el archivo actual y deja el nuevo en la misma
+  // carpeta — si esa carpeta es de root (/opt, /usr/local/bin) no puede.
+  if (/EACCES|EPERM|permission denied/i.test(msg)) {
+    return process.platform === "linux"
+      ? "No hay permiso para reemplazar la app en su carpeta actual. Mueve el archivo Aukani-POS.AppImage a una carpeta del usuario (ej. ~/Applications) y vuelve a abrirla."
+      : "No hay permiso para instalar la actualización."
+  }
+  if (/ENOTFOUND|ECONNRESET|ETIMEDOUT|ECONNREFUSED|net::ERR_/i.test(msg)) {
+    return "Se perdió la conexión durante la descarga. Revisa el internet y vuelve a intentar."
+  }
+  return msg
+}
+
 if (!isDev) {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
@@ -474,13 +496,22 @@ if (!isDev) {
     // esto sí queda silencioso de verdad: cierra, instala y reabre solo, sin UI.
     setTimeout(() => autoUpdater.quitAndInstall(true, true), 2000)
   })
+  // Sin esto el modal de actualización (que no se puede cerrar) quedaba trabado para
+  // siempre en "Descargando..." o "Instalando..." si algo fallaba (se cortó la red,
+  // o en Linux el AppImage está en una carpeta sin permiso de escritura) — el renderer
+  // lo usa para mostrar el error con un botón de reintentar. Los errores del chequeo
+  // silencioso al arrancar también llegan acá, pero el modal los ignora si no hay
+  // una actualización en curso.
   autoUpdater.on("error", (err) => {
     console.error("[AutoUpdater] Error:", err?.message)
+    mainWindow?.webContents.send("updater:error", { message: describeUpdaterError(err) })
   })
 }
 
 ipcMain.on("updater:start-download", () => {
-  if (!isDev) autoUpdater.downloadUpdate()
+  // El error ya llega al renderer por el evento "error" — el catch solo evita
+  // el unhandled rejection de la promesa.
+  if (!isDev) autoUpdater.downloadUpdate().catch(() => {})
 })
 
 ipcMain.handle("app:check-for-updates", async () => {

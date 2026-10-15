@@ -12,7 +12,7 @@
     "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "electron:build": "node scripts/set-default-config.js && vite build && electron-builder",
     "electron:build:win": "node scripts/set-default-config.js && vite build && electron-builder --win",
-    "electron:release:win": "node scripts/set-default-config.js && vite build && electron-builder --win --publish always",
+    "electron:build:linux": "node scripts/set-default-config.js && vite build && electron-builder --linux",
     "electron:preview": "electron ."
   },
   "build": {
@@ -31,14 +31,16 @@
     "publish": {
       "provider": "github",
       "owner": "BreaktneSs",
-      "repo": "AukaniApp"
+      "repo": "AukaniApp",
+      "releaseType": "draft"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Office",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "Aukani-POS.${ext}"
     },
     "win": {
       "target": [

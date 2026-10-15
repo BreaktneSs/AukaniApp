@@ -1,0 +1,108 @@
+name: Electron release
+
+# Construye y publica el cliente Electron para Windows (.exe NSIS) y Linux
+# (.AppImage) cada vez que se sube un tag de versión "vX.Y.Z". Cada plataforma
+# se construye en su propio runner nativo — así los módulos nativos (cpu-features,
+# que usa ssh2) quedan compilados para el sistema correcto, y no hace falta wine
+# para generar el .exe.
+#
+# Flujo:
+#   1. "release" crea el release en GitHub como BORRADOR (draft).
+#   2. "build" (Windows y Linux en paralelo) sube sus artefactos a ese borrador:
+#        Windows → Aukani-POS-Setup-X.Y.Z.exe + .blockmap + latest.yml
+#        Linux   → Aukani-POS-X.Y.Z.AppImage + latest-linux.yml
+#   3. "publish" lo publica solo si AMBOS builds terminaron bien.
+#
+# Mientras es borrador, electron-updater no lo ve — los clientes nunca encuentran
+# un release a medias (ej. con el .exe pero sin el AppImage, o al revés).
+#
+# Los tags "backend-v*" NO disparan este workflow (los maneja backend-release.yml).
+#
+# Para sacar una versión:
+#   1. Subir "version" en aukani-electron/package.json (ej. 1.5.0) y commitear.
+#   2. git tag v1.5.0 && git push origin main v1.5.0
+#
+# Valores por defecto embebidos (opcional): si se definen como Variables del repo
+# (Settings → Secrets and variables → Actions → Variables), se pasan a
+# scripts/set-default-config.js — mismo efecto que exportarlas al construir local.
+
+"on":
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verificar que el tag coincide con la versión de package.json
+        run: |
+          PKG_VERSION=$(node -p "require('./aukani-electron/package.json').version")
+          if [ "v$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::El tag $GITHUB_REF_NAME no coincide con package.json (v$PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Crear release en borrador
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --draft --title "${GITHUB_REF_NAME#v}" --generate-notes
+
+  build:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+          - os: ubuntu-latest
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: aukani-electron
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: aukani-electron/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Configuración por defecto embebida
+        env:
+          AUKANI_SERVER_URL: ${{ vars.AUKANI_SERVER_URL }}
+          AUKANI_REMOTE_HOST: ${{ vars.AUKANI_REMOTE_HOST }}
+          AUKANI_REMOTE_PORT: ${{ vars.AUKANI_REMOTE_PORT }}
+          AUKANI_IGNORE_CERT_ERRORS: ${{ vars.AUKANI_IGNORE_CERT_ERRORS }}
+        run: node scripts/set-default-config.js
+
+      - name: Build del frontend
+        run: npx vite build
+
+      - name: Empaquetar y subir al release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.target }} --publish always
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

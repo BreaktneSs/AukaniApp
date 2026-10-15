@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onUpdateAvailable:  (callback) => ipcRenderer.on("updater:available",  (_e, info) => callback(info)),
   onUpdateProgress:   (callback) => ipcRenderer.on("updater:progress",   (_e, data) => callback(data)),
   onUpdateDownloaded: (callback) => ipcRenderer.on("updater:downloaded", callback),
+  onUpdateError:      (callback) => ipcRenderer.on("updater:error",      (_e, data) => callback(data)),
   startUpdateDownload:() => ipcRenderer.send("updater:start-download"),
 
   // ── Controles de ventana (sin marco nativo — barra propia) ──
