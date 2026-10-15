@@ -39,7 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: aukani-electron
 
       - name: Verificar que el tag coincide con la versión de package.json
         run: |
@@ -69,11 +71,16 @@ jobs:
       run:
         working-directory: aukani-electron
     steps:
+      # Solo aukani-electron: el repo tiene node_modules versionados en otras
+      # carpetas (ej. aukani-agent) con symlinks y rutas largas que rompen el
+      # checkout en Windows ("Filename too long").
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: aukani-electron
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
