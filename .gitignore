@@ -6,3 +6,4 @@ node_modules/
 */release/
 aukani-electron/electron/default-config.json
 
+aukani-electron/dist/
