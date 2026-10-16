@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, session } from "electron"
 import { fileURLToPath } from "url"
 import path from "path"
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs"
-import { execSync, execFileSync } from "child_process"
+import { execSync, execFileSync, spawn } from "child_process"
 import { tmpdir } from "os"
 import net from "net"
 import { Client as SSHClient } from "ssh2"
@@ -80,8 +80,17 @@ app.on("certificate-error", (event, webContents, url, error, certificate, callba
   }
 })
 
+// AppImage: app.relaunch() no sirve — en Linux deja un proceso "relauncher" que
+// corre desde el montaje temporal (/tmp/.mount_Aukani*), y ese montaje desaparece
+// apenas este proceso sale: el relauncher moría con SIGTRAP y la app no volvía a
+// abrir. En su lugar se lanza el propio archivo .AppImage (env APPIMAGE) como
+// proceso independiente, que se vuelve a montar solo.
 ipcMain.on("config:relaunch", () => {
-  app.relaunch()
+  if (process.env.APPIMAGE) {
+    spawn(process.env.APPIMAGE, process.argv.slice(1), { detached: true, stdio: "ignore" }).unref()
+  } else {
+    app.relaunch()
+  }
   app.exit(0)
 })
 
