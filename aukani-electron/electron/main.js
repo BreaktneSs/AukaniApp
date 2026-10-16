@@ -14,8 +14,11 @@ const isDev = !app.isPackaged
 
 // ── Config en userData ────────────────────────────────────
 
+// Dev y la app instalada comparten la misma carpeta userData (~/.config/aukani-electron
+// en Linux, %APPDATA%\aukani-electron en Windows) — archivos separados para que la
+// config de desarrollo (ej. backend local) no se mezcle con la de la app instalada.
 function configPath() {
-  return path.join(app.getPath("userData"), "config.json")
+  return path.join(app.getPath("userData"), isDev ? "config-dev.json" : "config.json")
 }
 
 // Valores por defecto embebidos al construir el instalador (ver scripts/set-default-config.js).

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react"
-import { Loader2, ServerCrash, CheckCircle2 } from "lucide-react"
+import { Loader2, ServerCrash, CheckCircle2, Link2 } from "lucide-react"
 import toast from "react-hot-toast"
 import Checkbox from "@/components/ui/Checkbox"
+import RemoteAccessModal from "@/components/ui/RemoteAccessModal"
 
 const FINGERPRINT = "Aukani POS API running"
 
@@ -23,9 +24,15 @@ export default function SetupPage() {
   const [state, setState] = useState("idle") // idle | checking | ok | error
   const [ignoreCert, setIgnoreCert] = useState(!!window.electronAPI?.ignoreCertErrors)
   const [appVersion, setAppVersion] = useState("")
+  // Acceso remoto: si el servidor solo es alcanzable por el túnel SSH (fuera de la
+  // red local), hay que poder abrirlo ANTES de verificar la URL — si no, la
+  // verificación falla siempre y no hay forma de terminar la configuración.
+  const [showRemoteModal, setShowRemoteModal] = useState(false)
+  const [remoteConnected, setRemoteConnected] = useState(false)
 
   useEffect(() => {
     window.electronAPI?.getVersion?.().then(setAppVersion).catch(() => {})
+    window.electronAPI?.remoteStatus?.().then(({ connected }) => setRemoteConnected(connected)).catch(() => {})
   }, [])
 
   const handleIgnoreCertToggle = async () => {
@@ -35,8 +42,7 @@ export default function SetupPage() {
     window.electronAPI.relaunch()
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const verifyAndSave = async () => {
     const normalized = normalizeUrl(url)
     setState("checking")
     try {
@@ -44,15 +50,35 @@ export default function SetupPage() {
       if (!ok) { setState("error"); return }
       setState("ok")
       await window.electronAPI.setServerUrl(normalized)
-      setTimeout(() => window.electronAPI.relaunch(), 800)
+      // Recargar la ventana (no relaunch): el preload vuelve a leer la config con la
+      // URL nueva, y el túnel SSH — que vive en el proceso main — sigue conectado.
+      // Con relaunch() se cortaba y había que volver a conectarlo en el login.
+      setTimeout(() => window.location.reload(), 800)
     } catch {
       setState("error")
     }
   }
 
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    verifyAndSave()
+  }
+
   return (
-    <div className="flex items-center justify-center p-4"
+    <div className="flex items-center justify-center p-4 relative"
       style={{ minHeight: "calc(100vh - 32px)", background: "var(--bg-primary)" }}>
+
+      {/* Acceso remoto — mismo ícono y posición que en el login */}
+      <button onClick={() => setShowRemoteModal(true)} title="Acceso remoto"
+        className="absolute top-4 left-4 p-2 rounded-md transition-colors btn-ghost">
+        <span className="relative block">
+          <Link2 size={18} style={remoteConnected ? { color: "var(--brand)" } : {}} />
+          {remoteConnected && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: "var(--brand)" }} />
+          )}
+        </span>
+      </button>
+
       <div className="w-full max-w-sm animate-slide-up">
 
         {/* Logo */}
@@ -108,6 +134,12 @@ export default function SetupPage() {
                     No se pudo conectar. Verifica que la URL sea correcta y que el servidor esté encendido.
                   </p>
                 </div>
+                {!remoteConnected && (
+                  <button type="button" onClick={() => setShowRemoteModal(true)}
+                    className="btn-outline btn-md w-full flex items-center justify-center gap-2">
+                    <Link2 size={14} /> ¿Fuera de la red local? Conectar acceso remoto
+                  </button>
+                )}
                 <div className="rounded-lg px-3 py-2.5" style={{ background: "var(--bg-tertiary)" }}>
                   <Checkbox
                     checked={ignoreCert}
@@ -144,6 +176,21 @@ export default function SetupPage() {
           Aukani POS{appVersion ? ` v${appVersion}` : ""}
         </p>
       </div>
+
+      {showRemoteModal && (
+        <RemoteAccessModal
+          onClose={() => {
+            setShowRemoteModal(false)
+            window.electronAPI.remoteStatus().then(({ connected }) => setRemoteConnected(connected))
+          }}
+          onConnected={() => {
+            setRemoteConnected(true)
+            setShowRemoteModal(false)
+            // Si ya había escrito una URL, reintentar la verificación por el túnel
+            if (url.trim() && url.trim() !== "http://") verifyAndSave()
+          }}
+        />
+      )}
     </div>
   )
 }
