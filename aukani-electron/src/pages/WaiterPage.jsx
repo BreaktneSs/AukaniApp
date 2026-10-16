@@ -532,25 +532,27 @@ export default function WaiterPage() {
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoriesService.getAll })
 
   // Productos
+  // Filtro de categoría EN EL SERVIDOR (categoryId): antes se cargaban solo los
+  // primeros 200 productos por nombre y se filtraba acá — cualquier producto
+  // más allá del puesto 200 alfabético no salía en NINGUNA categoría, solo
+  // buscándolo por nombre. La key va bajo "products-all" para que los
+  // invalidateQueries(["products-all"]) existentes la sigan refrescando.
   const { data: allData } = useQuery({
-    queryKey: ["products-all"],
-    queryFn: () => productsService.getAll({ limit: 200 }),
+    queryKey: ["products-all", "grid", selectedCategory],
+    queryFn: () => productsService.getAll({ limit: 200, categoryId: selectedCategory || undefined }),
     staleTime: 60_000,
   })
   const allProducts = [...(allData?.products || [])].sort((a, b) => a.name.localeCompare(b.name))
 
   const { data: searchData, isFetching } = useQuery({
-    queryKey: ["products-search", query],
-    queryFn: () => productsService.getAll({ search: query, limit: 50 }),
+    queryKey: ["products-search", query, selectedCategory],
+    queryFn: () => productsService.getAll({ search: query, limit: 50, categoryId: selectedCategory || undefined }),
     enabled: query.length >= 1,
     staleTime: 0,
   })
   const searchResults = searchData?.products || []
 
-  const base = query.length >= 1 ? searchResults : allProducts
-  const displayProducts = selectedCategory
-    ? base.filter(p => String(p.categoryId) === selectedCategory)
-    : base
+  const displayProducts = query.length >= 1 ? searchResults : allProducts
 
   // Carrito
   const addItem = (product) => {

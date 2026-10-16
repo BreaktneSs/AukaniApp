@@ -1184,10 +1184,14 @@ export default function POSPage() {
   // Categorías
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoriesService.getAll })
 
-  // Todos los productos — usando getAll que ya devuelve { products, total }
+  // Filtro de categoría EN EL SERVIDOR (categoryId): antes se cargaban solo los
+  // primeros 200 productos por nombre y se filtraba acá — cualquier producto
+  // más allá del puesto 200 alfabético no salía en NINGUNA categoría, solo
+  // buscándolo por nombre. La key va bajo "products-all" para que los
+  // invalidateQueries(["products-all"]) existentes la sigan refrescando.
   const { data: allData } = useQuery({
-    queryKey: ["products-all"],
-    queryFn: () => productsService.getAll({ limit: 200 }),
+    queryKey: ["products-all", "grid", selectedCategory],
+    queryFn: () => productsService.getAll({ limit: 200, categoryId: selectedCategory || undefined }),
     staleTime: 60_000,
     placeholderData: keepPreviousData,
   })
@@ -1195,18 +1199,29 @@ export default function POSPage() {
 
   // Búsqueda — también usa getAll con search param
   const { data: searchData, isFetching } = useQuery({
-    queryKey: ["products-search", query],
-    queryFn: () => productsService.getAll({ search: query, limit: 50 }),
+    queryKey: ["products-search", query, selectedCategory],
+    queryFn: () => productsService.getAll({ search: query, limit: 50, categoryId: selectedCategory || undefined }),
     enabled: query.length >= 1,
     staleTime: 0,
   })
   const searchResults = searchData?.products || []
 
-  // Productos a mostrar + filtro categoría
-  const base = query.length >= 1 ? searchResults : allProducts
-  const displayProducts = selectedCategory
-    ? base.filter(p => String(p.categoryId) === selectedCategory)
-    : base
+  // Productos a mostrar (ya vienen filtrados por categoría desde el servidor)
+  const displayProducts = query.length >= 1 ? searchResults : allProducts
+
+  // Índice para consultar stock/tipo de lo que está en el carrito — NO puede salir
+  // solo de allProducts, que ahora depende de la categoría elegida: al cambiar de
+  // categoría, los ítems de otra perderían su tope de stock (y en cuentas no se
+  // podría subir la cantidad). Junta la lista sin filtrar (misma key que el chip
+  // "Todos", así que no es un fetch extra), la categoría actual y la búsqueda.
+  const { data: unfilteredData } = useQuery({
+    queryKey: ["products-all", "grid", ""],
+    queryFn: () => productsService.getAll({ limit: 200 }),
+    staleTime: 60_000,
+  })
+  const productIndex = new Map(
+    [...(unfilteredData?.products || []), ...allProducts, ...searchResults].map(p => [p.id, p])
+  )
 
   // Inicializar pago
   useEffect(() => {
@@ -1572,7 +1587,8 @@ export default function POSPage() {
                       <button onClick={clearActive} className="text-xs btn-ghost px-2 py-0.5 rounded" style={{ color: "var(--danger)" }}>Limpiar</button>
                     </div>
                     {items.map(item => {
-                      const cartProduct = allProducts.find(p => p.id === item.id)
+                      // Fallback: la copia del producto que guardó el carrito al agregarlo
+                      const cartProduct = productIndex.get(item.id) ?? item
                       return (
                         <CartItem key={item.id} item={item} onUpdate={updateQuantity} onRemove={removeItem}
                           onEditQty={touchMode ? (id, val, name) => setNumPad({ id, value: val, label: name }) : undefined}
@@ -1585,7 +1601,7 @@ export default function POSPage() {
                 )}
                 {/* Items de cuenta — mismo CartItem que ventas normales, callbacks apuntan al backend */}
                 {isAccount && remoteItems.map(item => {
-                  const availableStock = allProducts.find(p => p.id === item.id)?.stock ?? 0
+                  const availableStock = productIndex.get(item.id)?.stock ?? 0
                   const isBusy = (isUpdatingAccount && updatingVars?.accountItemId === item.accountItemId) ||
                                  (isRemovingAccount && removingVars?.accountItemId === item.accountItemId)
                   return (

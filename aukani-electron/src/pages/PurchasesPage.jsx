@@ -115,7 +115,7 @@ function InvoiceRow({ item, onQty, onCost, onRemove, touchMode, onOpenNumPad }) 
 }
 
 // ── Modal nueva compra ─────────────────────────────────────
-function PurchaseModal({ open, onClose, allProducts, onSuccess }) {
+function PurchaseModal({ open, onClose, onSuccess }) {
   const qc = useQueryClient()
   const { touchMode } = useUiStore()
   const [query, setQuery]         = useState("")
@@ -143,12 +143,20 @@ function PurchaseModal({ open, onClose, allProducts, onSuccess }) {
     onError: e => toast.error(e.response?.data?.error || "Error al registrar compra"),
   })
 
-  const q = query.trim().toLowerCase()
-  const searchResults = q.length < 1 ? [] : allProducts.filter(p =>
-    p.name.toLowerCase().includes(q) ||
-    p.barcode?.toLowerCase().includes(q) ||
-    p.sku?.toLowerCase().includes(q)
-  ).slice(0, 8)
+  // Búsqueda en el servidor (nombre, SKU o código de barras), igual que en caja.
+  // Antes filtraba una lista local cargada bajo la key compartida "products-all":
+  // caja y mesero la llenan con solo 200 productos, así que si se entraba a
+  // compras después de caja (dentro de los 60s de staleTime) la búsqueda corría
+  // sobre esos 200 y ciertos productos "no existían" hasta que la cache se
+  // refrescaba un rato después.
+  const q = query.trim()
+  const { data: searchData, isFetching: searching } = useQuery({
+    queryKey: ["products-search", "purchase", q],
+    queryFn: () => productsService.getAll({ search: q, type: "PHYSICAL", limit: 8 }),
+    enabled: open && q.length >= 1,
+    staleTime: 0,
+  })
+  const searchResults = q.length < 1 ? [] : (searchData?.products ?? [])
 
   const addProduct = (product) => {
     setInvoiceItems(prev => {
@@ -225,7 +233,7 @@ function PurchaseModal({ open, onClose, allProducts, onSuccess }) {
                 ))}
               </div>
             )}
-            {q.length >= 1 && searchResults.length === 0 && (
+            {q.length >= 1 && searchResults.length === 0 && !searching && (
               <p className="text-xs text-center py-2" style={{ color: "var(--text-muted)" }}>Sin resultados para "{query}"</p>
             )}
           </div>
@@ -714,14 +722,6 @@ export default function PurchasesPage() {
   const [filterReturnUser, setFilterReturnUser] = useState("")
   const [histPage,       setHistPage]       = useState(1)
 
-  const { data: productsData } = useQuery({
-    queryKey: ["products-all"],
-    queryFn:  () => productsService.getAll({ limit: 1000, active: true }),
-    staleTime: 60_000,
-    placeholderData: keepPreviousData,
-  })
-  const allProducts = (productsData?.products ?? []).filter(p => p.type === "PHYSICAL")
-
   const histParams = {
     page:  histPage,
     limit: 15,
@@ -870,7 +870,6 @@ export default function PurchasesPage() {
       <PurchaseModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        allProducts={allProducts}
         onSuccess={() => setHistPage(1)}
       />
     </div>
