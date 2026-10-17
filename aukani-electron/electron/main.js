@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session } from "electron"
+import { app, BrowserWindow, ipcMain, session, screen } from "electron"
 import { fileURLToPath } from "url"
 import path from "path"
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs"
@@ -406,12 +406,49 @@ ipcMain.handle("remote:status", () => ({ connected: !!sshClient, info: activeCon
 let mainWindow = null
 let allowClose = false // se pone en true solo tras confirmar el cierre desde el renderer
 
+// ── Escala de la interfaz (zoom) ──────────────────────────
+// Solo valores fijos — nada de escalas arbitrarias que dejen textos/íconos a medio
+// píxel. El layout está pensado para un mínimo de 1024×600 px CSS: con zoom z la
+// ventana necesita 1024·z × 600·z px reales, así que una escala solo se ofrece si
+// eso cabe en el área útil de la pantalla donde está la ventana — así nunca se
+// puede elegir una escala que deje la app cortada o inutilizable.
+const ZOOM_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5]
+const BASE_MIN = { width: 1024, height: 600 }
+
+function workAreaFor(win) {
+  return (win ? screen.getDisplayMatching(win.getBounds()) : screen.getPrimaryDisplay()).workAreaSize
+}
+
+function zoomFits(z, area) {
+  return BASE_MIN.width * z <= area.width && BASE_MIN.height * z <= area.height
+}
+
+// La escala guardada puede no caber si la config viene de otra pantalla más grande
+function clampZoom(z, area) {
+  if (!ZOOM_STEPS.includes(z)) z = 1
+  if (zoomFits(z, area)) return z
+  return [...ZOOM_STEPS].reverse().find(s => s <= z && zoomFits(s, area)) ?? ZOOM_STEPS[0]
+}
+
+function applyZoom(win, z) {
+  win.webContents.setZoomFactor(z)
+  const minW = Math.round(BASE_MIN.width * z)
+  const minH = Math.round(BASE_MIN.height * z)
+  win.setMinimumSize(minW, minH)
+  // setMinimumSize no agranda la ventana sola en todas las plataformas
+  if (!win.isMaximized() && !win.isFullScreen()) {
+    const [w, h] = win.getSize()
+    if (w < minW || h < minH) win.setSize(Math.max(w, minW), Math.max(h, minH))
+  }
+}
+
 function createWindow() {
+  const zoom = clampZoom(Number(readConfig().zoomFactor) || 1, workAreaFor(null))
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 1024,
-    minHeight: 600,
+    minWidth: Math.round(BASE_MIN.width * zoom),
+    minHeight: Math.round(BASE_MIN.height * zoom),
     title: "Aukani POS",
     icon: path.join(__dirname, "icon.png"),
     autoHideMenuBar: true,
@@ -420,6 +457,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      zoomFactor: zoom,
     },
   })
 
@@ -466,6 +504,32 @@ ipcMain.on("window:maximize", () => {
 ipcMain.on("window:close", () => mainWindow?.close())
 ipcMain.handle("window:is-maximized", () => mainWindow?.isMaximized() ?? false)
 
+// Escala: el renderer aplica primero SIN guardar (persist=false) y solo guarda
+// cuando el usuario confirma; si no confirma, vuelve a aplicar la anterior. Así,
+// si la app se cierra o crashea a mitad de la prueba, arranca con la escala vieja.
+ipcMain.handle("window:get-scale-info", () => {
+  const area = workAreaFor(mainWindow)
+  return {
+    current: mainWindow?.webContents.getZoomFactor() ?? 1,
+    options: ZOOM_STEPS.map(value => ({ value, fits: zoomFits(value, area) })),
+  }
+})
+
+ipcMain.handle("window:set-zoom", (_, factor, persist) => {
+  if (!mainWindow) return { ok: false }
+  const z = Number(factor)
+  if (!ZOOM_STEPS.includes(z) || !zoomFits(z, workAreaFor(mainWindow))) {
+    return { ok: false, error: "Escala no disponible en esta pantalla" }
+  }
+  applyZoom(mainWindow, z)
+  if (persist) {
+    const cfg = readConfig()
+    cfg.zoomFactor = z
+    writeConfig(cfg)
+  }
+  return { ok: true }
+})
+
 // ── Auto-actualización (GitHub Releases) ──────────────────
 // Solo tiene sentido empaquetado — en dev no hay metadata de update y tira error.
 // Chequeo silencioso al abrir la app: si no hay red o no hay nada nuevo, no pasa
@@ -506,7 +570,17 @@ if (!isDev) {
     // instalador en modo NORMAL (interactivo), reabriendo el wizard completo con la
     // página de configuración incluida, como si fuera una instalación nueva. Con
     // esto sí queda silencioso de verdad: cierra, instala y reabre solo, sin UI.
-    setTimeout(() => autoUpdater.quitAndInstall(true, true), 2000)
+    //
+    // allowClose=true: sin esto el cierre que dispara quitAndInstall() caía en el
+    // interceptor de "close" (confirmación + logout) — la app vieja quedaba abierta
+    // con el popup de cerrar sesión mientras la nueva ya arrancaba (en Linux se
+    // veían las dos). Se salta a propósito: NO se hace logout, así la versión nueva
+    // retoma la sesión (token en localStorage), las pestañas de venta (también en
+    // localStorage) y la caja abierta (el turno vive en el backend), sin preguntar.
+    setTimeout(() => {
+      allowClose = true
+      autoUpdater.quitAndInstall(true, true)
+    }, 2000)
   })
   // Sin esto el modal de actualización (que no se puede cerrar) quedaba trabado para
   // siempre en "Descargando..." o "Instalando..." si algo fallaba (se cortó la red,
@@ -516,6 +590,7 @@ if (!isDev) {
   // una actualización en curso.
   autoUpdater.on("error", (err) => {
     console.error("[AutoUpdater] Error:", err?.message)
+    allowClose = false // si falló la instalación, el próximo cierre manual vuelve a confirmar
     mainWindow?.webContents.send("updater:error", { message: describeUpdaterError(err) })
   })
 }

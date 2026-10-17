@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
-import { Palette, Sun, Moon, X, Check, Plus } from "lucide-react"
+import { createPortal } from "react-dom"
+import { Palette, Sun, Moon, X, Check, Plus, Monitor } from "lucide-react"
 import { useThemeStore } from "@/store/theme.store"
 import { useA11yStore, PRODUCT_LABEL_PRESETS } from "@/store/a11y.store"
 
@@ -9,6 +10,9 @@ const FONT_OPTIONS = [
   { key: "lg", label: "A",  title: "Grande",     px: 16 },
   { key: "xl", label: "A",  title: "Muy grande", px: 19 },
 ]
+
+// Segundos para confirmar una escala nueva antes de volver sola a la anterior
+const SCALE_CONFIRM_SECONDS = 15
 
 // Returns true if the hex color is light (needs dark text/icon on top)
 function isLight(hex) {
@@ -32,6 +36,59 @@ export default function AccessibilityWidget() {
 
   const isDark = theme === "dark"
   const isCustomActive = productLabelColor === "custom"
+
+  // ── Escala de la interfaz (solo Electron) ──
+  // La escala se aplica de inmediato pero SIN guardar; hay que confirmarla en
+  // SCALE_CONFIRM_SECONDS o se revierte sola — si la escala nueva deja la app
+  // inusable en esa pantalla, basta con no tocar nada. El estado vive acá (no
+  // dentro del panel desplegable) para que cerrar el panel no cancele el timer.
+  const hasScale = !!window.electronAPI?.getScaleInfo
+  const [scaleInfo, setScaleInfo] = useState(null)        // { current, options: [{ value, fits }] }
+  const [pendingScale, setPendingScale] = useState(null)  // { value, prev }
+  const [countdown, setCountdown] = useState(SCALE_CONFIRM_SECONDS)
+  const pendingRef = useRef(null)
+  pendingRef.current = pendingScale
+
+  const refreshScaleInfo = () => window.electronAPI.getScaleInfo().then(setScaleInfo).catch(() => {})
+
+  useEffect(() => { if (open && hasScale) refreshScaleInfo() }, [open])
+
+  const chooseScale = async (value) => {
+    if (pendingScale || !scaleInfo || value === scaleInfo.current) return
+    const prev = scaleInfo.current
+    const res = await window.electronAPI.setZoom(value, false)
+    if (!res?.ok) return
+    setOpen(false) // que el panel no quede encima del modal de confirmación
+    setCountdown(SCALE_CONFIRM_SECONDS)
+    setPendingScale({ value, prev })
+    setScaleInfo(info => ({ ...info, current: value }))
+  }
+
+  const confirmScale = async () => {
+    await window.electronAPI.setZoom(pendingScale.value, true)
+    setPendingScale(null)
+  }
+
+  const revertScale = async () => {
+    const p = pendingRef.current
+    if (!p) return
+    setPendingScale(null)
+    await window.electronAPI.setZoom(p.prev, false)
+    setScaleInfo(info => info && ({ ...info, current: p.prev }))
+  }
+
+  useEffect(() => {
+    if (!pendingScale) return
+    if (countdown <= 0) { revertScale(); return }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [pendingScale, countdown])
+
+  // Si el widget se desmonta con una escala sin confirmar (ej. cambio de pantalla), revertir
+  useEffect(() => () => {
+    const p = pendingRef.current
+    if (p) window.electronAPI?.setZoom(p.prev, false)
+  }, [])
 
   useEffect(() => {
     const onDown = (e) => {
@@ -203,6 +260,33 @@ export default function AccessibilityWidget() {
               </div>
             </div>
 
+            {/* Escala de la interfaz */}
+            {hasScale && scaleInfo && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+                  <Monitor size={12} /> Escala de la interfaz
+                </p>
+                <div className="grid grid-cols-3 gap-1">
+                  {scaleInfo.options.map(opt => {
+                    const active = Math.abs(scaleInfo.current - opt.value) < 0.001
+                    return (
+                      <button key={opt.value}
+                        disabled={!opt.fits || !!pendingScale}
+                        title={opt.fits ? undefined : "No cabe en esta pantalla"}
+                        onClick={() => chooseScale(opt.value)}
+                        className="py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-35 disabled:cursor-not-allowed"
+                        style={{
+                          background: active ? "var(--brand)" : "var(--bg-tertiary)",
+                          color: active ? "white" : "var(--text-secondary)",
+                        }}>
+                        {Math.round(opt.value * 100)}%
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Contraste */}
             <div className="space-y-1.5">
               <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Contraste</p>
@@ -225,6 +309,30 @@ export default function AccessibilityWidget() {
 
           </div>
         </div>
+      )}
+
+      {/* Confirmación de escala — en un portal (fuera de la barra de título, que es
+          zona de arrastre) y con no-drag para que los botones reciban el click */}
+      {pendingScale && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 10000, background: "rgba(0,0,0,0.6)", WebkitAppRegion: "no-drag" }}>
+          <div className="card p-5 w-full max-w-xs space-y-4 animate-slide-up">
+            <div>
+              <h3 className="font-display font-bold text-base" style={{ color: "var(--text-primary)" }}>
+                ¿Mantener escala al {Math.round(pendingScale.value * 100)}%?
+              </h3>
+              <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                Si no confirmas, vuelve al {Math.round(pendingScale.prev * 100)}% en{" "}
+                <span className="font-bold" style={{ color: "var(--text-primary)" }}>{countdown}</span> s.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={revertScale} className="btn-outline btn-md flex-1">Revertir</button>
+              <button onClick={confirmScale} className="btn-primary btn-md flex-1">Mantener</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

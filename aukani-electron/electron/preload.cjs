@@ -45,5 +45,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   windowMaximize:         () => ipcRenderer.send("window:maximize"),
   windowClose:            () => ipcRenderer.send("window:close"),
   windowIsMaximized:      () => ipcRenderer.invoke("window:is-maximized"),
+
+  // ── Escala de la interfaz (zoom) ──────────────────────
+  getScaleInfo: ()                 => ipcRenderer.invoke("window:get-scale-info"),
+  setZoom:      (factor, persist)  => ipcRenderer.invoke("window:set-zoom", factor, !!persist),
   onWindowMaximizedChange:(callback) => ipcRenderer.on("window:maximized-changed", (_e, isMaximized) => callback(isMaximized)),
 })
