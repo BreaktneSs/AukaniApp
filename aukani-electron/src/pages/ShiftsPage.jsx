@@ -132,6 +132,41 @@ function ForceCloseModal({ shift, onClose, onConfirm, loading }) {
   )
 }
 
+// ── Egresos pagados con el método de pago de una fila de ventas ──
+const methodId = (x) => x.paymentMethodId ?? x.paymentMethod?.id
+function expensesForMethod(shift, payment) {
+  return (shift.expenses || [])
+    .filter(e => methodId(e) === methodId(payment))
+    .reduce((s, e) => s + Number(e.amount), 0)
+}
+
+// ── Filas de ventas por método + métodos que solo tienen egresos (sin ventas) ──
+function paymentRowsWithExpenses(shift) {
+  const rows = [...(shift.shiftPayments || [])]
+  for (const e of shift.expenses || []) {
+    if (!rows.some(r => methodId(r) === methodId(e))) {
+      rows.push({ id: `exp-${methodId(e)}`, paymentMethodId: methodId(e), total: 0, paymentMethod: e.paymentMethod })
+    }
+  }
+  return rows
+}
+
+// ── Cuenta del método: después de egresos + egresos = sin egresos ──
+function MethodExpensesDetail({ name, total, expenses }) {
+  return (
+    <div className="mt-1 ml-2 pl-2 border-l-2 space-y-0.5 text-xs font-mono" style={{ borderColor: "var(--border)" }}>
+      <div className="flex justify-between">
+        <span className="font-sans" style={{ color: "var(--text-muted)" }}>+ Egresos en {name.toLowerCase()}</span>
+        <span style={{ color: "var(--danger)" }}>{formatCOP(expenses)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="font-sans" style={{ color: "var(--text-muted)" }}>= {name} sin egresos</span>
+        <span style={{ color: "var(--text-primary)" }}>{formatCOP(total)}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Detalle de turno ──────────────────────────────────────
 function ShiftDetailModal({ shiftId, onClose, onForceClose }) {
   const { data: shift, isLoading } = useQuery({
@@ -218,15 +253,28 @@ function ShiftDetailModal({ shiftId, onClose, onForceClose }) {
       </div>
 
       {/* Por método de pago */}
-      {shift.shiftPayments?.length > 0 && (
+      {(shift.shiftPayments?.length > 0 || shift.expenses?.length > 0) && (
         <div className="card p-4 mb-4 space-y-2">
           <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Ventas por método de pago</p>
-          {shift.shiftPayments.map(p => (
-            <div key={p.id} className="flex justify-between text-sm">
-              <span style={{ color: "var(--text-secondary)" }}>{p.paymentMethod?.name}</span>
-              <span className="font-mono font-bold" style={{ color: "var(--brand)" }}>{formatCOP(p.total)}</span>
-            </div>
-          ))}
+          {paymentRowsWithExpenses(shift).map(p => {
+            const methodExpenses = expensesForMethod(shift, p)
+            const hasExpenses = methodExpenses > 0
+            const net = Number(p.total) - methodExpenses
+            return (
+              <div key={p.id}>
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {p.paymentMethod?.name}
+                    {hasExpenses && <span className="text-xs ml-1" style={{ color: "var(--text-muted)" }}>(después de egresos)</span>}
+                  </span>
+                  <span className="font-mono font-bold" style={{ color: net < 0 ? "var(--danger)" : "var(--brand)" }}>
+                    {formatCOP(net)}
+                  </span>
+                </div>
+                {hasExpenses && <MethodExpensesDetail name={p.paymentMethod?.name || "Método"} total={p.total} expenses={methodExpenses} />}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -387,12 +435,25 @@ function ActiveShiftCard({ shift, onView, onForceClose }) {
       {/* Por método + egresos */}
       {(shift.shiftPayments?.length > 0 || totalExpenses > 0) && (
         <div className="space-y-1 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
-          {shift.shiftPayments?.map(p => (
-            <div key={p.id} className="flex justify-between text-xs">
-              <span style={{ color: "var(--text-secondary)" }}>{p.paymentMethod?.name}</span>
-              <span className="font-mono" style={{ color: "var(--text-primary)" }}>{formatCOP(p.total)}</span>
-            </div>
-          ))}
+          {paymentRowsWithExpenses(shift).map(p => {
+            const methodExpenses = expensesForMethod(shift, p)
+            const hasExpenses = methodExpenses > 0
+            const net = Number(p.total) - methodExpenses
+            return (
+              <div key={p.id}>
+                <div className="flex justify-between text-xs">
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {p.paymentMethod?.name}
+                    {hasExpenses && <span className="ml-1" style={{ color: "var(--text-muted)" }}>(después de egresos)</span>}
+                  </span>
+                  <span className="font-mono" style={{ color: net < 0 ? "var(--danger)" : "var(--text-primary)" }}>
+                    {formatCOP(net)}
+                  </span>
+                </div>
+                {hasExpenses && <MethodExpensesDetail name={p.paymentMethod?.name || "Método"} total={p.total} expenses={methodExpenses} />}
+              </div>
+            )
+          })}
           {totalExpenses > 0 && (
             <div className="flex justify-between text-xs pt-0.5 border-t" style={{ borderColor: "var(--border)" }}>
               <span style={{ color: "var(--danger)" }}>Egresos</span>
@@ -643,6 +704,7 @@ export default function ShiftsPage() {
   const [detailId, setDetailId] = useState(null)
   const [forceCloseShift, setForceCloseShift] = useState(null) // shift object to force-close
   const [page, setPage] = useState(1)
+  const [dateFilters, setDateFilters] = useState({ from: "", to: "" })
   const qcPage = useQueryClient()
 
   const closeShiftMut = useMutation({
@@ -668,13 +730,22 @@ export default function ShiftsPage() {
     refetchInterval: 30_000,
   })
 
+  // "YYYY-MM-DD" del input → ISO del inicio/fin de ese día en hora local
+  const dayStartISO = (d) => d ? new Date(`${d}T00:00:00`).toISOString() : undefined
+  const dayEndISO   = (d) => d ? new Date(`${d}T23:59:59.999`).toISOString() : undefined
+  const setDateFilter = (key, value) => { setDateFilters(f => ({ ...f, [key]: value })); setPage(1) }
+
   const { data: historyData, isLoading: loadingHistory } = useQuery({
-    queryKey: ["shifts-history", page],
+    queryKey: ["shifts-history", page, dateFilters],
     // El filtro por status va al backend (antes se pedían 15 turnos sin filtrar y se
     // descartaban los OPEN acá — con eso casi nunca se completaba una página de 15
     // cerrados, así que "history.length < 15" quedaba en true por siempre y el botón
     // "→" se veía deshabilitado aunque sí hubiera más turnos cerrados después).
-    queryFn: () => shiftsService.getAll({ page, limit: 15, status: "CLOSED" }),
+    queryFn: () => shiftsService.getAll({
+      page, limit: 15, status: "CLOSED",
+      from: dayStartISO(dateFilters.from),
+      to:   dayEndISO(dateFilters.to),
+    }),
     enabled: activeTab === "Historial",
   })
 
@@ -785,7 +856,29 @@ export default function ShiftsPage() {
 
       {/* ── Historial ── */}
       {activeTab === "Historial" && (
-        <div>
+        <div className="space-y-3">
+          {/* Filtro por fecha de apertura */}
+          <div className="card p-3 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-muted)" }}>Desde</label>
+              <input type="date" className="input text-sm"
+                value={dateFilters.from} max={dateFilters.to || undefined}
+                onChange={e => setDateFilter("from", e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-muted)" }}>Hasta</label>
+              <input type="date" className="input text-sm"
+                value={dateFilters.to} min={dateFilters.from || undefined}
+                onChange={e => setDateFilter("to", e.target.value)} />
+            </div>
+            {(dateFilters.from || dateFilters.to) && (
+              <button onClick={() => { setDateFilters({ from: "", to: "" }); setPage(1) }}
+                className="btn-ghost btn-sm flex items-center gap-1">
+                <X size={13} /> Limpiar
+              </button>
+            )}
+          </div>
+
           {loadingHistory ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 size={20} className="animate-spin" style={{ color: "var(--text-muted)" }} />
@@ -805,6 +898,13 @@ export default function ShiftsPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {history.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                          {dateFilters.from || dateFilters.to ? "No hay turnos en ese rango de fechas" : "No hay turnos cerrados"}
+                        </td>
+                      </tr>
+                    )}
                     {history.map((s, i) => {
                       const totalSales = (s.shiftPayments || []).reduce((ss, p) => ss + Number(p.total), 0)
                       const diff = Number(s.difference || 0)

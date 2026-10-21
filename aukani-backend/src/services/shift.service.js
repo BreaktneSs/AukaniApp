@@ -247,11 +247,18 @@ export const shiftService = {
     return results[results.length - 1]
   },
 
-  async getAll({ page = 1, limit = 20, userId, status } = {}) {
+  async getAll({ page = 1, limit = 20, userId, status, from, to } = {}) {
     const skip = (page - 1) * limit
     const where = {}
     if (userId) where.userId = userId
     if (status === "OPEN" || status === "CLOSED") where.status = status
+    // from/to llegan como ISO ya calculados en la hora local del cliente
+    // (inicio y fin del día), así que acá se usan tal cual.
+    if (from || to) {
+      where.openedAt = {}
+      if (from) where.openedAt.gte = new Date(from)
+      if (to)   where.openedAt.lte = new Date(to)
+    }
 
     const [shifts, total] = await Promise.all([
       prisma.shift.findMany({
